@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Logo Paliers</title>
+  <desc id="desc">Badge circulaire avec une trajectoire en escalier et des bulles évoquant une remontée par paliers.</desc>
+  <defs>
+    <linearGradient id="bg" x1="32" y1="24" x2="224" y2="232" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#79f2df"/>
+      <stop offset="0.52" stop-color="#6ea0ff"/>
+      <stop offset="1" stop-color="#ffb86b"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="64" y1="64" x2="192" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#09111d"/>
+      <stop offset="1" stop-color="#0f1c31"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)"/>
+  <circle cx="128" cy="128" r="100" fill="url(#inner)"/>
+  <circle cx="128" cy="128" r="86" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="6"/>
+  <path d="M78 164h42v-28h26v-28h32v-28h0" fill="none" stroke="#eff4ff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M82 162h103" fill="none" stroke="rgba(255,184,107,0.86)" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="92" cy="92" r="10" fill="#79f2df"/>
+  <circle cx="116" cy="74" r="6" fill="#6ea0ff"/>
+  <circle cx="144" cy="60" r="4.5" fill="#ffb86b"/>
+  <path d="M156 178c-8 0-14 6-14 14v6h28v-6c0-8-6-14-14-14Z" fill="#eff4ff"/>
+  <path d="M152 182h8v18h-8z" fill="#09111d"/>
+  <path d="M176 104c0 10-8 18-18 18s-18-8-18-18 8-18 18-18" fill="none" stroke="#79f2df" stroke-width="8" stroke-linecap="round"/>
+</svg>
