@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Palier - Simulateur pédagogique de plongée</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-1"></div>
+    <div class="ambient ambient-2"></div>
+
+    <main class="shell">
+      <section class="hero card">
+        <div class="hero-copy">
+          <p class="eyebrow">Simulateur pédagogique</p>
+          <h1>Comprendre le calcul des paliers en plongée</h1>
+          <p class="lede">
+            Cette web app illustre, étape par étape, comment une plongée peut conduire à des paliers avec un modèle compartimenté de type Haldane.
+            Chaque tissu est calculé séparément pour rendre visible le compartiment directeur.
+          </p>
+          <div class="notice">
+            <strong>Important :</strong> ce simulateur est éducatif et applique un modèle historique simplifié de Haldane. Il ne remplace pas une table officielle, un ordinateur de plongée ni une formation.
+          </div>
+        </div>
+        <div class="hero-panel">
+          <div class="stat">
+            <span>Profondeur</span>
+            <strong id="summaryDepth">30 m</strong>
+          </div>
+          <div class="stat">
+            <span>Temps fond</span>
+            <strong id="summaryTime">20 min</strong>
+          </div>
+          <div class="stat">
+            <span>Résultat</span>
+            <strong id="summaryResult">Palier(s) nécessaire(s)</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <section class="card controls">
+          <div class="section-head">
+            <h2>Paramètres du profil</h2>
+            <p>Déplace les curseurs pour voir comment la profondeur et la durée modifient les paliers.</p>
+          </div>
+
+          <label class="field">
+            <span>Profondeur maximale</span>
+            <div class="field-row">
+              <input id="depth" type="range" min="6" max="60" step="1" value="30" />
+              <output id="depthValue">30 m</output>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Temps fond</span>
+            <div class="field-row">
+              <input id="time" type="range" min="5" max="180" step="1" value="20" />
+              <output id="timeValue">20 min</output>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Vitesse de descente</span>
+            <div class="field-row">
+              <input id="descentRate" type="range" min="10" max="30" step="1" value="20" />
+              <output id="descentRateValue">20 m/min</output>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Vitesse de remontée</span>
+            <div class="field-row">
+              <input id="ascentRate" type="range" min="6" max="15" step="1" value="10" />
+              <output id="ascentRateValue">10 m/min</output>
+            </div>
+          </label>
+
+          <div class="subsection">
+            <div class="subsection-head">
+              <h3>Deuxième plongée</h3>
+              <label class="toggle-row">
+                <input id="secondDiveEnabled" type="checkbox" checked />
+                <span>Activer</span>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Intervalle surface</span>
+              <div class="field-row">
+                <input id="surfaceInterval" type="range" min="0" max="720" step="1" value="60" />
+                <output id="surfaceIntervalValue">60 min</output>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>Profondeur seconde plongée</span>
+              <div class="field-row">
+                <input id="secondDepth" type="range" min="6" max="60" step="1" value="20" />
+                <output id="secondDepthValue">20 m</output>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>Temps seconde plongée</span>
+              <div class="field-row">
+                <input id="secondTime" type="range" min="5" max="180" step="1" value="25" />
+                <output id="secondTimeValue">25 min</output>
+              </div>
+            </label>
+
+            <p class="helper-text">Si l'intervalle de surface est inférieur à 15 min, la série est traitée comme une plongée consécutive; au-delà, elle est traitée comme une plongée successive avec azote résiduel.</p>
+          </div>
+
+          <button id="resetButton" class="button-secondary" type="button">Recharger un exemple</button>
+        </section>
+
+        <section class="card explanation">
+          <div class="section-head">
+            <h2>Explication du calcul</h2>
+            <p>Le moteur applique l'équation exponentielle de Haldane sur chaque compartiment.</p>
+          </div>
+
+          <ol id="steps" class="steps"></ol>
+
+          <div class="formula-block">
+            <div class="formula-title">Formules utilisées</div>
+            <div class="formula-lines">
+              <div>P<sub>tissu</sub>(t) = P<sub>i</sub> + (P<sub>0</sub> - P<sub>i</sub>)e<sup>-kt</sup></div>
+              <div>P<sub>tissu</sub>(t) = P<sub>i</sub>(t) - R/k + (P<sub>0</sub> - P<sub>i</sub>(0) + R/k)e<sup>-kt</sup></div>
+              <div>Critère Haldane: P<sub>tissu</sub> ≤ 2 × P<sub>ambiante</sub></div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="grid grid-wide">
+        <section class="card result">
+          <div class="section-head">
+            <h2>Profil de remontée</h2>
+            <p>Le profil complet inclut la descente, le fond et les phases de remontée réellement calculées à partir des tissus.</p>
+          </div>
+          <div id="timeline" class="timeline"></div>
+        </section>
+
+        <section class="card result">
+          <div class="section-head">
+            <h2>Résultats clés</h2>
+            <p>Vue synthétique pour l’utilisateur final.</p>
+          </div>
+          <div class="result-list">
+            <div class="result-item">
+              <span>Pression absolue estimée</span>
+              <strong id="pressureValue">4,0 bar</strong>
+            </div>
+            <div class="result-item">
+              <span>Limite sans palier Haldane</span>
+              <strong id="ndlValue">15 min</strong>
+            </div>
+            <div class="result-item">
+              <span>Tissu directeur</span>
+              <strong id="controllingTissueValue">5 min</strong>
+            </div>
+            <div class="result-item">
+              <span>Type de série</span>
+              <strong id="sequenceTypeValue">Plongée simple</strong>
+            </div>
+            <div class="result-item">
+              <span>Intervalle surface</span>
+              <strong id="surfaceIntervalSummaryValue">60 min</strong>
+            </div>
+            <div class="result-item">
+              <span>Plafond Haldane maximal</span>
+              <strong id="maxCeilingValue">0 m</strong>
+            </div>
+            <div class="result-item">
+              <span>Temps total de remontée</span>
+              <strong id="ascentTimeValue">0 min</strong>
+            </div>
+            <div class="result-item">
+              <span>Durée totale du profil</span>
+              <strong id="runtimeValue">0 min</strong>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="card tissues-panel">
+        <div class="section-head">
+          <h2>Compartiments tissulaires</h2>
+          <p>Chaque carte montre la tension d'azote, le plafond Haldane et la marge au moment où la remontée commence.</p>
+        </div>
+        <div id="tissues" class="tissues"></div>
+      </section>
+
+      <section class="card phase-table-panel">
+        <div class="section-head">
+          <h2>TN2 par phase</h2>
+          <p>Chaque ligne correspond à l'état des compartiments à la fin d'une phase réelle de la plongée.</p>
+        </div>
+        <div class="phase-table-wrap">
+          <div id="phaseTable" class="phase-table"></div>
+        </div>
+      </section>
+
+      <section class="card course-panel">
+        <div class="section-head">
+          <h2>Cours pas à pas</h2>
+          <p>Lecture ligne par ligne du calcul Haldane utilisé par l'application.</p>
+        </div>
+        <div id="course" class="course"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
