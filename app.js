@@ -3,10 +3,24 @@ const defaults = {
   time: 20,
   descentRate: 20,
   ascentRate: 10,
-  secondDiveEnabled: true,
+  secondDiveEnabled: false,
   surfaceInterval: 60,
   secondDepth: 20,
   secondTime: 25,
+  thirdSurfaceInterval: 60,
+  thirdDepth: 18,
+  thirdTime: 20,
+};
+
+const state = {
+  additionalDives: [
+    {
+      enabled: false,
+      surfaceInterval: defaults.thirdSurfaceInterval,
+      depth: defaults.thirdDepth,
+      time: defaults.thirdTime,
+    },
+  ],
 };
 
 const compartments = [
@@ -47,9 +61,6 @@ const elements = {
   surfaceIntervalValue: document.getElementById("surfaceIntervalValue"),
   secondDepthValue: document.getElementById("secondDepthValue"),
   secondTimeValue: document.getElementById("secondTimeValue"),
-  summaryDepth: document.getElementById("summaryDepth"),
-  summaryTime: document.getElementById("summaryTime"),
-  summaryResult: document.getElementById("summaryResult"),
   pressureValue: document.getElementById("pressureValue"),
   ndlValue: document.getElementById("ndlValue"),
   controllingTissueValue: document.getElementById("controllingTissueValue"),
@@ -59,9 +70,10 @@ const elements = {
   ascentTimeValue: document.getElementById("ascentTimeValue"),
   runtimeValue: document.getElementById("runtimeValue"),
   steps: document.getElementById("steps"),
-  timeline: document.getElementById("timeline"),
+  phaseDiagram: document.getElementById("phaseDiagram"),
+  secondDiveParams: document.getElementById("secondDiveParams"),
+  additionalDives: document.getElementById("additionalDives"),
   tissues: document.getElementById("tissues"),
-  resetButton: document.getElementById("resetButton"),
 };
 
 function roundToHalfMinute(value) {
@@ -91,6 +103,79 @@ function formatTension(value) {
 
 function formatDepth(value) {
   return `${value.toFixed(1)} m`;
+}
+
+function formatStopLabel(duration, depth) {
+  return `Palier ${formatStopMinutes(duration)} à ${formatDepth(depth)}`;
+}
+
+function cloneDive(dive) {
+  return {
+    enabled: dive.enabled,
+    surfaceInterval: dive.surfaceInterval,
+    depth: dive.depth,
+    time: dive.time,
+  };
+}
+
+function formatSurfaceIntervals(intervals) {
+  if (!intervals.length) {
+    return "0 min";
+  }
+
+  return intervals.map((interval) => formatMinutes(interval)).join(" puis ");
+}
+
+function renderAdditionalDiveBlock(dive, index) {
+  const diveNumber = index + 3;
+  return `
+    <article class="dive-card" data-dive-index="${index}">
+      <div class="dive-card-head">
+        <div>
+          <h4>Plongée ${diveNumber}</h4>
+          <p>L'intervalle de surface relie cette plongée à la précédente.</p>
+        </div>
+        <label class="toggle-row">
+          <input data-field="enabled" data-dive-index="${index}" type="checkbox" ${dive.enabled ? "checked" : ""} />
+          <span>Activer</span>
+        </label>
+      </div>
+
+      <div class="dive-card-fields" ${dive.enabled ? "" : "hidden"}>
+      <label class="field">
+        <span>Intervalle surface</span>
+        <div class="field-row">
+          <input data-field="surfaceInterval" data-dive-index="${index}" type="range" min="0" max="720" step="1" value="${dive.surfaceInterval}" />
+          <output>${formatMinutes(dive.surfaceInterval)}</output>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Profondeur plongée ${diveNumber}</span>
+        <div class="field-row">
+          <input data-field="depth" data-dive-index="${index}" type="range" min="6" max="60" step="1" value="${dive.depth}" />
+          <output>${dive.depth} m</output>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Temps plongée ${diveNumber}</span>
+        <div class="field-row">
+          <input data-field="time" data-dive-index="${index}" type="range" min="5" max="180" step="1" value="${dive.time}" />
+          <output>${dive.time} min</output>
+        </div>
+      </label>
+      </div>
+    </article>
+  `;
+}
+
+function buildAdditionalDiveBlocks() {
+  if (state.additionalDives.length === 0) {
+    return '<p class="helper-text">Aucune plongée supplémentaire pour le moment. Utilise le bouton ci-dessus pour en ajouter une.</p>';
+  }
+
+  return state.additionalDives.map((dive, index) => renderAdditionalDiveBlock(dive, index)).join("");
 }
 
 function ambientPressure(depth) {
@@ -202,7 +287,7 @@ function findHoldMinutes(tensions, currentDepth, nextDepth, travelMinutes) {
   return Math.max(1, Math.ceil(high));
 }
 
-function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabled, surfaceInterval, secondDepth, secondTime) {
+function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabled, surfaceInterval, secondDepth, secondTime, additionalDives = []) {
   const firstDive = buildDiveModel(depth, time, descentRate, ascentRate, {
     labelPrefix: "Plongée 1",
   });
@@ -221,47 +306,92 @@ function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabl
     };
   }
 
-  const intervalMinutes = Math.max(0, surfaceInterval);
-  const intervalTensions = simulateConstantPhase(firstDive.finalTensions, 0, intervalMinutes);
-  const intervalSnapshot = buildSnapshot(intervalTensions, 0);
-  const relationship = intervalMinutes < 15 ? "consécutive" : "successive";
-  const secondDive = buildDiveModel(secondDepth, secondTime, descentRate, ascentRate, {
-    initialTensions: intervalTensions,
-    labelPrefix: "Plongée 2",
-    startLabel: relationship === "consécutive" ? "Départ de la plongée consécutive" : "Départ de la plongée successive",
-    startKind: "surfaceStart",
-    startDepth: 0,
+  function addSurfaceIntervalAndDive(previousDive, intervalMinutes, diveDepth, diveTime, diveLabel, diveNumber) {
+    const safeIntervalMinutes = Math.max(0, intervalMinutes);
+    const intervalTensions = simulateConstantPhase(previousDive.finalTensions, 0, safeIntervalMinutes);
+    const intervalSnapshot = buildSnapshot(intervalTensions, 0);
+    const relationship = safeIntervalMinutes < 15 ? "consécutive" : "successive";
+    const nextDive = buildDiveModel(diveDepth, diveTime, descentRate, ascentRate, {
+      initialTensions: intervalTensions,
+      labelPrefix: diveLabel,
+      startLabel: `Départ de la plongée ${diveNumber}`,
+      startKind: "surfaceStart",
+      startDepth: 0,
+    });
+
+    return {
+      intervalPhase: {
+        label: `Intervalle surface ${formatMinutes(safeIntervalMinutes)}`,
+        kind: "surfaceInterval",
+        duration: safeIntervalMinutes,
+        depth: 0,
+        relationship,
+        nextDiveNumber: diveNumber,
+      },
+      intervalPhaseSnapshot: {
+        label: `Intervalle surface ${formatMinutes(safeIntervalMinutes)}`,
+        kind: "surfaceInterval",
+        depth: 0,
+        duration: safeIntervalMinutes,
+        nextDiveNumber: diveNumber,
+        ambientPressure: ambientPressure(0),
+        snapshot: intervalSnapshot,
+        tensions: cloneTensions(intervalTensions),
+        relationship,
+      },
+      nextDive,
+      relationship,
+      intervalMinutes: safeIntervalMinutes,
+    };
+  }
+
+  const divePlan = [
+    {
+      surfaceInterval,
+      depth: secondDepth,
+      time: secondTime,
+    },
+    ...additionalDives.filter((dive) => dive.enabled).map(cloneDive),
+  ];
+
+  let combinedPhases = [...firstDive.phases];
+  let combinedSnapshots = [...firstDive.phaseSnapshots];
+  let combinedRuntime = firstDive.totalRuntime;
+  let combinedAscentTime = firstDive.totalAscentTime;
+  let finalModel = firstDive;
+  const transitions = [];
+  const surfaceIntervals = [];
+
+  divePlan.forEach((dive, index) => {
+    const diveNumber = index + 2;
+    const transition = addSurfaceIntervalAndDive(finalModel, dive.surfaceInterval, dive.depth, dive.time, `Plongée ${diveNumber}`, diveNumber);
+
+    transitions.push(transition);
+    surfaceIntervals.push(transition.intervalMinutes);
+    combinedPhases = [...combinedPhases, transition.intervalPhase, ...transition.nextDive.phases];
+    combinedSnapshots = [...combinedSnapshots, transition.intervalPhaseSnapshot, ...transition.nextDive.phaseSnapshots];
+    combinedRuntime += transition.intervalMinutes + transition.nextDive.totalRuntime;
+    combinedAscentTime += transition.intervalMinutes + transition.nextDive.totalAscentTime;
+    finalModel = transition.nextDive;
   });
 
-  const intervalPhase = {
-    label: `Intervalle surface ${formatMinutes(intervalMinutes)}`,
-    kind: "surfaceInterval",
-    duration: intervalMinutes,
-    depth: 0,
-    relationship,
-  };
-
-  const intervalPhaseSnapshot = {
-    label: `Intervalle surface ${formatMinutes(intervalMinutes)}`,
-    kind: "surfaceInterval",
-    depth: 0,
-    duration: intervalMinutes,
-    ambientPressure: ambientPressure(0),
-    snapshot: intervalSnapshot,
-    tensions: cloneTensions(intervalTensions),
-    relationship,
-  };
+  const sequenceType = transitions.length === 0
+    ? "Plongée simple"
+    : `Série de ${transitions.length + 1} plongées (${transitions.map((transition) => transition.relationship).join(", ")})`;
 
   return {
-    sequenceType: relationship === "consécutive" ? "Plongée consécutive" : "Plongée successive",
-    surfaceInterval: intervalMinutes,
-    phases: [...firstDive.phases, intervalPhase, ...secondDive.phases],
-    phaseSnapshots: [...firstDive.phaseSnapshots, intervalPhaseSnapshot, ...secondDive.phaseSnapshots],
-    finalModel: secondDive,
+    sequenceType,
+    surfaceInterval: surfaceIntervals[0] || 0,
+    surfaceIntervals,
+    phases: combinedPhases,
+    phaseSnapshots: combinedSnapshots,
+    finalModel,
     primaryModel: firstDive,
-    combinedAscentTime: firstDive.totalAscentTime + intervalMinutes + secondDive.totalAscentTime,
-    combinedRuntime: firstDive.totalRuntime + intervalMinutes + secondDive.totalRuntime,
-    relationship,
+    combinedAscentTime,
+    combinedRuntime,
+    relationship: transitions[0]?.relationship || "simple",
+    relationships: transitions.map((transition) => transition.relationship),
+    dives: divePlan,
   };
 }
 
@@ -371,7 +501,7 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
       });
 
       phases.push({
-        label: `${labelPrefix}Palier à ${currentDepth} m`,
+        label: `${labelPrefix}${formatStopLabel(holdMinutes, currentDepth)}`,
         kind: "stop",
         duration: holdMinutes,
         depth: currentDepth,
@@ -448,7 +578,7 @@ function buildExplanation(depth, time, descentRate, ascentRate, model) {
   }
 
   lines.push(`6. Le temps total de remontée est de ${formatMinutes(model.totalAscentTime)} et la durée totale du profil est de ${formatMinutes(model.totalRuntime)}.`);
-  lines.push(`7. Le tissu directeur au fond est ${model.controllingTissue.name} (${model.controllingTissue.label}), avec un plafond théorique de ${formatDepth(model.maxCeiling)}.`);
+  lines.push(`7. Le compartiment directeur du profil est ${model.controllingTissue.name} (${model.controllingTissue.label}), avec un plafond théorique maximal de ${formatDepth(model.maxCeiling)}.`);
 
   return lines;
 }
@@ -466,6 +596,294 @@ function buildTimeline(sequence) {
   }));
 }
 
+function buildPhaseDepthText(phase) {
+  if (phase.kind === "descent") {
+    return `${formatDepth(phase.from)} → ${formatDepth(phase.to)}`;
+  }
+
+  if (phase.kind === "ascent") {
+    return `${formatDepth(phase.from)} → ${formatDepth(phase.to)}`;
+  }
+
+  if (phase.kind === "surfaceInterval" || phase.kind === "surface" || phase.kind === "surfaceStart") {
+    return "Surface";
+  }
+
+  return formatDepth(phase.depth ?? 0);
+}
+
+function getPhasePlotDepth(phase) {
+  if (phase.kind === "descent" || phase.kind === "ascent") {
+    return phase.to;
+  }
+
+  if (phase.kind === "surfaceInterval" || phase.kind === "surface" || phase.kind === "surfaceStart") {
+    return 0;
+  }
+
+  return phase.depth ?? 0;
+}
+
+function getPhaseStartDepth(phase) {
+  if (phase.kind === "descent" || phase.kind === "ascent") {
+    return phase.from;
+  }
+
+  if (phase.kind === "surfaceInterval" || phase.kind === "surface" || phase.kind === "surfaceStart") {
+    return 0;
+  }
+
+  return phase.depth ?? 0;
+}
+
+function getPhaseDiagramNumber(index) {
+  return String(index + 1);
+}
+
+function getPhaseDiagramLegendText(phase, index) {
+  const number = index + 1;
+
+  if (phase.kind === "descent") {
+    return `${number}. Début descente ${formatDepth(phase.from)} → ${formatDepth(phase.to)}`;
+  }
+
+  if (phase.kind === "bottom") {
+    return `${number}. Début fond à ${formatDepth(phase.depth)}`;
+  }
+
+  if (phase.kind === "stop") {
+    return `${number}. ${formatStopLabel(phase.duration, phase.depth)}`;
+  }
+
+  if (phase.kind === "ascent") {
+    return `${number}. Début remontée ${formatDepth(phase.from)} → ${formatDepth(phase.to)}`;
+  }
+
+  if (phase.kind === "surfaceInterval") {
+    return `${number}. Début intervalle surface`;
+  }
+
+  if (phase.kind === "surfaceStart") {
+    return `${number}. Début surface`;
+  }
+
+  return `${number}. ${phase.label}`;
+}
+
+function getPhaseDiagramTooltipText(phase, index, duration) {
+  const parts = [`Durée: ${formatMinutes(duration)}`];
+
+  if (phase.kind === "surfaceInterval") {
+    parts.push(`Type: ${phase.relationship === "consécutive" ? "plongée consécutive" : "plongée successive"}`);
+  }
+
+  if (phase.kind === "descent" || phase.kind === "ascent") {
+    parts.push(`Trajet: ${formatDepth(phase.from)} → ${formatDepth(phase.to)}`);
+  } else if (phase.kind === "bottom") {
+    parts.push(`Profondeur: ${formatDepth(phase.depth)}`);
+  } else if (phase.kind === "stop") {
+    parts[0] = formatStopLabel(duration, phase.depth);
+  }
+
+  return parts.join(" • ");
+}
+
+function buildPhaseDiagram(sequence) {
+  const phases = sequence.phases;
+  const chartPhases = phases;
+  const height = 360;
+  const paddingX = 64;
+  const paddingY = 32;
+  const totalDuration = Math.max(1, phases.reduce((sum, phase) => sum + phase.duration, 0));
+  const minimumPlotWidth = 1400;
+  const durationScale = 40;
+  const durationOffset = 26;
+  const phaseWeights = chartPhases.map((phase) => durationOffset + Math.sqrt(Math.max(phase.duration, 1)) * durationScale);
+  const totalCompressedWidth = phaseWeights.reduce((sum, value) => sum + value, 0);
+  const width = Math.max(minimumPlotWidth, Math.ceil(totalCompressedWidth) + paddingX * 2);
+  const plotWidth = width - paddingX * 2;
+  const plotHeight = height - paddingY * 2 - 18;
+  const maxDepth = Math.max(3, ...chartPhases.map((phase) => getPhasePlotDepth(phase)));
+  const labelY = height - paddingY + 18;
+
+  let elapsed = 0;
+  let compressedCursor = 0;
+  const segments = chartPhases.map((phase, index) => {
+    const duration = phase.duration;
+    const weight = phaseWeights[index];
+    const xStart = paddingX + compressedCursor;
+    const xEnd = xStart + weight;
+    const startDepth = getPhaseStartDepth(phase);
+    const endDepth = getPhasePlotDepth(phase);
+    const yStart = paddingY + (startDepth / maxDepth) * plotHeight;
+    const yEnd = paddingY + (endDepth / maxDepth) * plotHeight;
+    const isFlat = Math.abs(startDepth - endDepth) <= EPSILON;
+    const plateauX = xStart + 4;
+    const plateauWidth = Math.max(0, weight - 8);
+    const relationshipLabel = phase.kind === "surfaceInterval"
+      ? (phase.relationship === "consécutive" ? "Consécutive" : "Successive")
+      : null;
+
+    const segment = {
+      phase,
+      xStart,
+      xEnd,
+      yStart,
+      yEnd,
+      x: xStart + weight / 2,
+      y: (yStart + yEnd) / 2,
+      depth: startDepth,
+      isFlat,
+      plateauX,
+      plateauWidth,
+      plateauY: yStart - 5,
+      relationshipLabel,
+      relationshipLabelX: (xStart + xEnd) / 2,
+      relationshipLabelY: Math.max(paddingY + 18, yStart + 18),
+      duration,
+      elapsed,
+    };
+
+    elapsed += duration;
+    compressedCursor += weight;
+    return segment;
+  });
+
+  const timeMarks = segments.map((segment) => ({ x: segment.xStart, time: segment.elapsed }));
+  if (timeMarks[timeMarks.length - 1]?.time !== totalDuration) {
+    timeMarks.push({ x: paddingX + totalCompressedWidth, time: totalDuration });
+  }
+
+  const xAxisTicks = timeMarks
+    .map((tick) => {
+      const timeValue = typeof tick === "number" ? tick : tick.time;
+      const x = typeof tick === "number" ? paddingX + (timeValue / totalDuration) * plotWidth : tick.x;
+      return `
+        <g class="phase-diagram-timeaxis">
+          <line x1="${x}" y1="${height - paddingY}" x2="${x}" y2="${height - paddingY + 8}"></line>
+          <text x="${x}" y="${labelY}" text-anchor="middle">${formatMinutes(timeValue)}</text>
+        </g>
+      `;
+    })
+    .join("");
+
+  const depthStep = maxDepth <= 12 ? 3 : maxDepth <= 30 ? 6 : 10;
+  const depthMarks = [];
+
+  for (let depth = 0; depth <= maxDepth + EPSILON; depth += depthStep) {
+    depthMarks.push(Math.min(maxDepth, depth));
+  }
+
+  if (depthMarks[depthMarks.length - 1] !== maxDepth) {
+    depthMarks.push(maxDepth);
+  }
+
+  const gridLines = depthMarks
+    .map((depth) => {
+      const y = paddingY + (depth / maxDepth) * plotHeight;
+      return `
+        <g class="phase-diagram-gridline">
+          <line x1="${paddingX}" y1="${y}" x2="${width - paddingX}" y2="${y}"></line>
+          <text x="${paddingX - 12}" y="${y + 4}" text-anchor="end">${formatDepth(depth)}</text>
+        </g>
+      `;
+    })
+    .join("");
+
+  const polylinePoints = segments
+    .flatMap((segment) => [`${segment.xStart},${segment.yStart}`, `${segment.xEnd},${segment.yEnd}`])
+    .join(" ");
+  const areaPoints = `${paddingX},${height - paddingY} ${polylinePoints} ${paddingX + totalCompressedWidth},${height - paddingY}`;
+
+  return `
+    <div class="phase-diagram-chart">
+      <div class="phase-diagram-chart-head">
+        <div>
+          <strong>Profondeur par phase</strong>
+          <p>La courbe garde l’ordre réel des phases, mais l’espacement horizontal est compressé: une phase longue prend plus de place qu’une phase courte, sans devenir strictement proportionnelle.</p>
+        </div>
+        <div class="phase-diagram-chart-legend">
+          <span class="phase-legend phase-legend--descent">Descente</span>
+          <span class="phase-legend phase-legend--bottom">Fond</span>
+          <span class="phase-legend phase-legend--stop">Palier</span>
+          <span class="phase-legend phase-legend--ascent">Remontée</span>
+          <span class="phase-legend phase-legend--surfaceInterval">Surface</span>
+        </div>
+      </div>
+
+      <div class="phase-diagram-scroll">
+        <svg class="phase-diagram-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Graphique des phases avec profondeur et durée">
+          <defs>
+            <linearGradient id="phaseAreaGradient" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="rgba(118, 228, 214, 0.28)" />
+              <stop offset="100%" stop-color="rgba(138, 180, 255, 0.05)" />
+            </linearGradient>
+            <linearGradient id="phaseLineGradient" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stop-color="#76e4d6" />
+              <stop offset="100%" stop-color="#8ab4ff" />
+            </linearGradient>
+          </defs>
+
+          <rect x="0" y="0" width="${width}" height="${height}" rx="20" class="phase-diagram-background"></rect>
+          <g class="phase-diagram-axes">
+            <line x1="${paddingX}" y1="${paddingY}" x2="${paddingX}" y2="${height - paddingY}"></line>
+            <line x1="${paddingX}" y1="${height - paddingY}" x2="${width - paddingX}" y2="${height - paddingY}"></line>
+          </g>
+          <g class="phase-diagram-grid">${gridLines}</g>
+          <g class="phase-diagram-timeaxis-group">
+            ${xAxisTicks}
+          </g>
+          <path d="M ${areaPoints}" fill="url(#phaseAreaGradient)"></path>
+          ${segments
+            .map(
+              (segment, index) => `
+                <g class="phase-diagram-segment-group phase-diagram-segment-group--${segment.phase.kind}">
+                  <title>${getPhaseDiagramTooltipText(segment.phase, index, segment.duration)}</title>
+                  ${segment.isFlat ? `<rect class="phase-diagram-plateau phase-diagram-plateau--${segment.phase.kind}" x="${segment.plateauX}" y="${segment.plateauY}" width="${segment.plateauWidth}" height="10" rx="5"></rect>` : ""}
+                  <line class="phase-diagram-segment phase-diagram-segment--${segment.phase.kind}${segment.isFlat ? ' phase-diagram-segment--flat' : ''}" x1="${segment.xStart}" y1="${segment.yStart}" x2="${segment.xEnd}" y2="${segment.yEnd}"></line>
+                  ${segment.relationshipLabel ? `
+                    <g class="phase-diagram-relationship phase-diagram-relationship--${segment.phase.relationship}">
+                      <rect x="${segment.relationshipLabelX - 46}" y="${segment.relationshipLabelY - 15}" width="92" height="22" rx="11"></rect>
+                      <text x="${segment.relationshipLabelX}" y="${segment.relationshipLabelY}" text-anchor="middle">${segment.relationshipLabel}</text>
+                    </g>
+                  ` : ""}
+                  <g class="phase-diagram-point phase-diagram-point--${segment.phase.kind}">
+                    <circle cx="${segment.x}" cy="${segment.y}" r="13"></circle>
+                    <text x="${segment.x}" y="${segment.y + 4}" text-anchor="middle" class="phase-diagram-point-number">${getPhaseDiagramNumber(index)}</text>
+                  </g>
+                </g>
+              `
+            )
+            .join("")}
+        </svg>
+      </div>
+      <div class="phase-diagram-axis-label">Temps écoulé (min, échelle schématique)</div>
+    </div>
+
+    <div class="phase-diagram-legend-list">
+      ${segments
+        .map(
+          (segment, index) => `
+            <article class="phase-diagram-item phase-diagram-item--${segment.phase.kind}">
+              <div class="phase-diagram-index">${getPhaseDiagramNumber(index)}</div>
+              <div class="phase-diagram-body">
+                <div class="phase-diagram-head">
+                  <div>
+                    <strong>${getPhaseDiagramLegendText(segment.phase, index)}</strong>
+                    <span>${buildPhaseDepthText(segment.phase)}</span>
+                  </div>
+                  <div class="phase-diagram-duration">${formatMinutes(segment.duration)}</div>
+                </div>
+                <div class="phase-diagram-bar"><span class="phase-diagram-fill phase-diagram-fill--${segment.phase.kind}" style="--width:${Math.max(10, Math.round((segment.duration / totalDuration) * 100))}%"></span></div>
+              </div>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function buildPhaseExplanation(phase, controllingTissue, nextPhase, model) {
   const tissueName = `${controllingTissue.label} (${controllingTissue.name})`;
   const ceilingText = controllingTissue.ceilingDepth <= EPSILON ? "0 m" : formatDepth(controllingTissue.ceilingDepth);
@@ -480,30 +898,29 @@ function buildPhaseExplanation(phase, controllingTissue, nextPhase, model) {
   }
 
   if (phase.kind === "bottom") {
-    return `Au fond, le tissu directeur est ${tissueName}. Il impose un plafond théorique de ${ceilingText}, ce qui signifie que la remontée ne peut pas se faire directement jusqu'à ${nextDepthText}.`;
+    return `Au fond, le tissu directeur est ${tissueName}. Il impose un plafond théorique de ${ceilingText}, ce qui impose un palier à ${nextDepthText}.`;
   }
 
   if (phase.kind === "stop") {
-    const stopDurationText = formatStopMinutes(phase.duration);
     return nextPhase
-      ? `Après ${stopDurationText} de palier à ${formatDepth(phase.depth)}, le tissu directeur reste ${tissueName}. La phase suivante devient compatible vers ${nextDepthText}.`
+      ? `Après ${formatStopLabel(phase.duration, phase.depth)}, le tissu directeur reste ${tissueName}. La phase suivante devient compatible vers ${nextDepthText}.`
       : `Après ce palier, le tissu directeur reste ${tissueName} avec un plafond de ${ceilingText}.`;
   }
 
   if (phase.kind === "ascent") {
-    return `Arrivée à ${formatDepth(phase.depth)}: le tissu directeur est ${tissueName}. Son plafond théorique est de ${ceilingText}, ce qui impose d'arrêter la remontée à ce niveau avant de poursuivre.`;
+    return `Arrivée à ${formatDepth(phase.depth)}: le tissu directeur est ${tissueName}. Son plafond théorique est de ${ceilingText}, ce qui impose de rester à cette profondeur tant que la suite du profil n'est pas compatible.`;
   }
 
   if (phase.kind === "surfaceInterval") {
     if (phase.relationship === "consécutive") {
-      return `Intervalle de surface de ${formatMinutes(phase.duration)}: il est inférieur à 15 min, donc la seconde immersion reste considérée comme consécutive. Les tissus continuent néanmoins à désaturer à la surface.`;
+      return `Intervalle de surface de ${formatMinutes(phase.duration)}: il est inférieur à 15 min, donc la plongée suivante reste considérée comme consécutive. Les tissus continuent néanmoins à désaturer à la surface.`;
     }
 
-    return `Intervalle de surface de ${formatMinutes(phase.duration)}: les tissus désaturent à la surface avant la deuxième immersion. La seconde plongée est traitée comme successive avec azote résiduel.`;
+    return `Intervalle de surface de ${formatMinutes(phase.duration)}: les tissus désaturent à la surface avant la plongée suivante. L'immersion suivante est traitée comme successive avec azote résiduel.`;
   }
 
   if (phase.kind === "surfaceStart") {
-    return `Départ de la deuxième plongée en surface avec azote résiduel: le tissu directeur est ${tissueName}. La deuxième immersion continue à partir de cette tension résiduelle.`;
+    return `Départ de la plongée suivante en surface avec azote résiduel: le tissu directeur est ${tissueName}. L'immersion suivante continue à partir de cette tension résiduelle.`;
   }
 
   return `Le tissu directeur est ${tissueName}, avec un plafond théorique de ${ceilingText}.`;
@@ -573,7 +990,7 @@ function buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth
     },
     {
       title: "6. Compartiment directeur",
-      text: `Le compartiment directeur est celui qui présente le plafond le plus élevé. Dans ce profil, c'est ${model.controllingTissue.label} (${model.controllingTissue.name}) avec un plafond maximal de ${formatDepth(model.maxCeiling)}.`,
+      text: `Le compartiment directeur est celui qui présente le plafond le plus élevé sur le profil complet. Ici, c'est ${model.controllingTissue.label} (${model.controllingTissue.name}) avec un plafond maximal de ${formatDepth(model.maxCeiling)}.`,
     },
     {
       title: "7. Remontée par paliers",
@@ -585,13 +1002,13 @@ function buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth
       title: "8. Durée des paliers",
       text: model.stops.length === 0
         ? `La durée de palier est nulle ici parce qu'aucun tissu ne dépasse le plafond autorisé au moment de la remontée. La surface est atteinte directement.`
-        : `Pour chaque phase, on cherche la plus petite durée de maintien t telle qu'après le palier puis la remontée vers la phase suivante, la tension de tous les tissus vérifie P_tissu ≤ 2 × P_ambiante. Dans le code, cette durée est trouvée par dichotomie. Le premier palier dure ${formatMinutes(model.stops[0].minutes)}.`,
+        : `Pour chaque phase, on cherche la plus petite durée de maintien, t, telle qu'après le palier puis la remontée vers la phase suivante, la tension de tous les tissus vérifie P_tissu ≤ 2 × P_ambiante. Dans le code, cette durée est trouvée par dichotomie. Le premier palier dure ${formatMinutes(model.stops[0].minutes)}.`,
     },
     {
       title: "9. Plongées successives et consécutives",
       text: sequence.sequenceType === "Plongée simple"
         ? `Aucune deuxième plongée n'est activée. Si tu ajoutes une seconde immersion, un intervalle de moins de 15 min sera traité comme une plongée consécutive, sinon comme une plongée successive avec azote résiduel.`
-        : `L'intervalle de surface est de ${formatMinutes(surfaceInterval)} avant une seconde plongée à ${secondDepth} m pendant ${formatMinutes(secondTime)}. Ici, la série est traitée comme ${sequence.sequenceType.toLowerCase()}.`,
+        : `La série enchaîne ${sequence.dives.map((dive, index) => `la plongée ${index + 2} à ${formatDepth(dive.depth)} pendant ${formatMinutes(dive.time)}`).join(", ")}. Les intervalles de surface sont ${formatSurfaceIntervals(sequence.surfaceIntervals)}. Ici, la série est traitée comme ${sequence.sequenceType.toLowerCase()}.`,
     },
     {
       title: "10. Temps total",
@@ -644,6 +1061,82 @@ function renderTissues(snapshot, maxCeiling) {
     .join("");
 }
 
+function syncSecondDiveParamsVisibility(secondDiveEnabled) {
+  elements.secondDiveParams.hidden = !secondDiveEnabled;
+  elements.secondDiveParams.setAttribute("aria-hidden", String(!secondDiveEnabled));
+
+  elements.secondDiveParams.querySelectorAll("input, output").forEach((element) => {
+    if (element.tagName === "INPUT") {
+      element.disabled = !secondDiveEnabled;
+    }
+  });
+}
+
+function syncAdditionalDivesVisibility(secondDiveEnabled) {
+  const visible = secondDiveEnabled;
+  elements.additionalDives.hidden = !visible;
+  elements.additionalDives.setAttribute("aria-hidden", String(!visible));
+
+  elements.additionalDives.querySelectorAll("input").forEach((element) => {
+    element.disabled = !visible;
+  });
+}
+
+function syncSliderOutput(input) {
+  const output = input.nextElementSibling;
+  if (!(output instanceof HTMLOutputElement)) {
+    return;
+  }
+
+  const value = Number(input.value);
+  switch (input.dataset.field || input.id) {
+    case "surfaceInterval":
+      output.textContent = formatMinutes(value);
+      break;
+    case "depth":
+    case "secondDepth":
+      output.textContent = `${value} m`;
+      break;
+    case "time":
+    case "secondTime":
+      output.textContent = `${value} min`;
+      break;
+    case "descentRate":
+    case "ascentRate":
+      output.textContent = `${value} m/min`;
+      break;
+    default:
+      break;
+  }
+}
+
+function syncVisibleSliderValues() {
+  syncSliderOutput(elements.depth);
+  syncSliderOutput(elements.time);
+  syncSliderOutput(elements.descentRate);
+  syncSliderOutput(elements.ascentRate);
+  syncSliderOutput(elements.surfaceInterval);
+  syncSliderOutput(elements.secondDepth);
+  syncSliderOutput(elements.secondTime);
+
+  elements.additionalDives.querySelectorAll("input[type='range']").forEach((input) => {
+    if (input instanceof HTMLInputElement) {
+      syncSliderOutput(input);
+    }
+  });
+}
+
+function updateAdditionalDiveFieldVisibility() {
+  elements.additionalDives.querySelectorAll(".dive-card").forEach((card) => {
+    const diveIndex = Number(card.dataset.diveIndex);
+    const dive = state.additionalDives[diveIndex];
+    const fields = card.querySelector(".dive-card-fields");
+    if (fields && dive) {
+      fields.hidden = !dive.enabled;
+    }
+  });
+}
+
 function render() {
   const depth = Number(elements.depth.value);
   const time = Number(elements.time.value);
@@ -653,26 +1146,31 @@ function render() {
   const surfaceInterval = Number(elements.surfaceInterval.value);
   const secondDepth = Number(elements.secondDepth.value);
   const secondTime = Number(elements.secondTime.value);
-  const sequence = buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabled, surfaceInterval, secondDepth, secondTime);
+  const sequence = buildDiveSequence(
+    depth,
+    time,
+    descentRate,
+    ascentRate,
+    secondDiveEnabled,
+    surfaceInterval,
+    secondDepth,
+    secondTime,
+    state.additionalDives
+  );
   const model = sequence.finalModel;
 
-  elements.depthValue.textContent = `${depth} m`;
-  elements.timeValue.textContent = `${time} min`;
-  elements.descentRateValue.textContent = `${descentRate} m/min`;
-  elements.ascentRateValue.textContent = `${ascentRate} m/min`;
-  elements.surfaceIntervalValue.textContent = formatMinutes(surfaceInterval);
-  elements.secondDepthValue.textContent = `${secondDepth} m`;
-  elements.secondTimeValue.textContent = `${secondTime} min`;
+  syncSecondDiveParamsVisibility(secondDiveEnabled);
+  elements.additionalDives.innerHTML = buildAdditionalDiveBlocks();
+  syncAdditionalDivesVisibility(secondDiveEnabled);
+  updateAdditionalDiveFieldVisibility();
 
-  elements.summaryDepth.textContent = `${depth} m`;
-  elements.summaryTime.textContent = `${time} min`;
-  elements.summaryResult.textContent = sequence.sequenceType;
+  syncVisibleSliderValues();
 
   elements.pressureValue.textContent = formatPressure(sequence.primaryModel.pressure);
   elements.ndlValue.textContent = formatMinutes(sequence.primaryModel.ndl);
   elements.controllingTissueValue.textContent = `${model.controllingTissue.label} (${model.controllingTissue.name})`;
   elements.sequenceTypeValue.textContent = sequence.sequenceType;
-  elements.surfaceIntervalSummaryValue.textContent = secondDiveEnabled ? formatMinutes(sequence.surfaceInterval) : "0 min";
+  elements.surfaceIntervalSummaryValue.textContent = secondDiveEnabled ? formatSurfaceIntervals(sequence.surfaceIntervals) : "0 min";
   elements.maxCeilingValue.textContent = model.maxCeiling <= EPSILON ? "0 m" : formatDepth(model.maxCeiling);
   elements.ascentTimeValue.textContent = formatMinutes(sequence.combinedAscentTime);
   elements.runtimeValue.textContent = formatMinutes(sequence.combinedRuntime);
@@ -681,18 +1179,7 @@ function render() {
     .map((step) => `<li>${step}</li>`)
     .join("");
 
-  const timelineSegments = buildTimeline(sequence);
-  elements.timeline.innerHTML = timelineSegments
-    .map(
-      (segment) => `
-        <div class="timeline-item">
-          <div class="timeline-label">${segment.label}</div>
-          <div class="timeline-bar"><span class="timeline-fill" style="--width:${segment.width}%"></span></div>
-          <div class="timeline-meta">${segment.value}</div>
-        </div>
-      `
-    )
-    .join("");
+  elements.phaseDiagram.innerHTML = buildPhaseDiagram(sequence);
 
   renderTissues(model.bottomSnapshot, model.maxCeiling);
 
@@ -713,26 +1200,46 @@ function render() {
     .join("");
 }
 
-function resetDemo() {
-  elements.depth.value = defaults.depth;
-  elements.time.value = defaults.time;
-  elements.descentRate.value = defaults.descentRate;
-  elements.ascentRate.value = defaults.ascentRate;
-  elements.secondDiveEnabled.checked = defaults.secondDiveEnabled;
-  elements.surfaceInterval.value = defaults.surfaceInterval;
-  elements.secondDepth.value = defaults.secondDepth;
-  elements.secondTime.value = defaults.secondTime;
-  render();
-}
+elements.depth.addEventListener("input", syncVisibleSliderValues);
+elements.time.addEventListener("input", syncVisibleSliderValues);
+elements.descentRate.addEventListener("input", syncVisibleSliderValues);
+elements.ascentRate.addEventListener("input", syncVisibleSliderValues);
+elements.surfaceInterval.addEventListener("input", syncVisibleSliderValues);
+elements.secondDepth.addEventListener("input", syncVisibleSliderValues);
+elements.secondTime.addEventListener("input", syncVisibleSliderValues);
 
-elements.depth.addEventListener("input", render);
-elements.time.addEventListener("input", render);
-elements.descentRate.addEventListener("input", render);
-elements.ascentRate.addEventListener("input", render);
+elements.additionalDives.addEventListener("input", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLInputElement && target.type === "range") {
+    syncSliderOutput(target);
+  }
+});
+
+elements.depth.addEventListener("change", render);
+elements.time.addEventListener("change", render);
+elements.descentRate.addEventListener("change", render);
+elements.ascentRate.addEventListener("change", render);
 elements.secondDiveEnabled.addEventListener("change", render);
-elements.surfaceInterval.addEventListener("input", render);
-elements.secondDepth.addEventListener("input", render);
-elements.secondTime.addEventListener("input", render);
-elements.resetButton.addEventListener("click", resetDemo);
+elements.surfaceInterval.addEventListener("change", render);
+elements.secondDepth.addEventListener("change", render);
+elements.secondTime.addEventListener("change", render);
+
+elements.additionalDives.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+
+  const diveIndex = Number(target.dataset.diveIndex);
+  const field = target.dataset.field;
+  const dive = state.additionalDives[diveIndex];
+
+  if (!dive || !field) {
+    return;
+  }
+
+  dive[field] = field === "enabled" ? target.checked : Number(target.value);
+  render();
+});
 
 render();

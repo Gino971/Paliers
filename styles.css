@@ -60,7 +60,7 @@ body {
   z-index: 1;
   width: min(1180px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 2rem 0 3rem;
+  padding: 1.4rem 0 2.25rem;
 }
 
 .card {
@@ -75,9 +75,9 @@ body {
 .hero {
   display: grid;
   grid-template-columns: 1.5fr 0.9fr;
-  gap: 1.5rem;
-  padding: 2rem;
-  margin-bottom: 1.5rem;
+  gap: 1.25rem;
+  padding: 1.65rem;
+  margin-bottom: 1.25rem;
 }
 
 .brand-lockup {
@@ -178,8 +178,8 @@ h1 {
 .grid {
   display: grid;
   grid-template-columns: 0.95fr 1.05fr;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
 }
 
 .grid-wide {
@@ -189,11 +189,11 @@ h1 {
 .controls,
 .explanation,
 .result {
-  padding: 1.5rem;
+  padding: 1.25rem;
 }
 
 .section-head {
-  margin-bottom: 1.2rem;
+  margin-bottom: 1rem;
 }
 
 .section-head h2 {
@@ -206,8 +206,8 @@ h1 {
 }
 
 .subsection {
-  margin-top: 1rem;
-  padding-top: 1rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -222,6 +222,15 @@ h1 {
 .subsection-head h3 {
   margin: 0;
   font-size: 1.05rem;
+}
+
+.second-dive-params {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.second-dive-params[hidden] {
+  display: none;
 }
 
 .toggle-row {
@@ -244,8 +253,8 @@ h1 {
 }
 
 .formula-block {
-  margin-top: 1.25rem;
-  padding: 1rem 1.1rem;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.045);
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -259,10 +268,27 @@ h1 {
 
 .formula-lines {
   display: grid;
-  gap: 0.45rem;
-  color: var(--muted);
-  line-height: 1.6;
+  gap: 0.75rem;
+}
+
+.formula-card {
+  padding: 0.9rem 0.95rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.formula-equation {
+  color: var(--text);
+  font-weight: 700;
+  line-height: 1.45;
   font-variant-numeric: tabular-nums;
+}
+
+.formula-note {
+  margin-top: 0.35rem;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .field {
@@ -325,9 +351,53 @@ output {
   background: linear-gradient(90deg, rgba(118, 228, 214, 0.26), rgba(138, 180, 255, 0.22));
 }
 
+.additional-dives {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.additional-dives[hidden] {
+  display: none;
+}
+
+.dive-card {
+  display: grid;
+  gap: 0.95rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.dive-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.dive-card-head h4 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.dive-card-head p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.dive-card-fields {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.dive-card-fields[hidden] {
+  display: none;
+}
+
 .steps {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.75rem;
   padding-left: 1.3rem;
   margin: 0;
 }
@@ -342,7 +412,7 @@ output {
 
 .timeline {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.75rem;
 }
 
 .timeline-item {
@@ -384,7 +454,7 @@ output {
 
 .result-list {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.7rem;
 }
 
 .result-item {
@@ -402,18 +472,332 @@ output {
 }
 
 .tissues-panel {
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
 }
 
 .course-panel {
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
 }
 
 .phase-table-panel {
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.phase-diagram-panel {
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.phase-diagram-chart {
+  display: grid;
+  gap: 1rem;
+}
+
+.phase-diagram-chart-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.phase-diagram-chart-head strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 1.05rem;
+}
+
+.phase-diagram-chart-head p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.phase-diagram-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.phase-legend {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.phase-legend--descent,
+.phase-diagram-point--descent circle,
+.phase-diagram-fill--descent {
+  fill: #76e4d6;
+  background: rgba(118, 228, 214, 0.16);
+}
+
+.phase-legend--bottom,
+.phase-diagram-point--bottom circle,
+.phase-diagram-fill--bottom {
+  fill: #ffb86b;
+  background: rgba(255, 184, 107, 0.16);
+}
+
+.phase-legend--stop,
+.phase-diagram-point--stop circle,
+.phase-diagram-fill--stop {
+  fill: #f7cc74;
+  background: rgba(247, 204, 116, 0.16);
+}
+
+.phase-legend--ascent,
+.phase-diagram-point--ascent circle,
+.phase-diagram-fill--ascent {
+  fill: #8ab4ff;
+  background: rgba(138, 180, 255, 0.16);
+}
+
+.phase-legend--surfaceInterval,
+.phase-diagram-point--surfaceInterval circle,
+.phase-diagram-fill--surfaceInterval,
+.phase-diagram-point--surface circle,
+.phase-diagram-fill--surface {
+  fill: #9cb0d1;
+  background: rgba(156, 176, 209, 0.16);
+}
+
+.phase-diagram-svg {
+  width: auto;
+  min-width: 100%;
+  max-width: none;
+  height: auto;
+  display: block;
+}
+
+.phase-diagram-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.35rem;
+}
+
+.phase-diagram-background {
+  fill: rgba(255, 255, 255, 0.03);
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.phase-diagram-axes line {
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1.5;
+}
+
+.phase-diagram-gridline line {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+}
+
+.phase-diagram-gridline text {
+  fill: var(--muted);
+  font-size: 12px;
+}
+
+.phase-diagram-timeaxis line {
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 1;
+}
+
+.phase-diagram-timeaxis text {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.phase-diagram-axis-label {
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+  margin-top: -0.15rem;
+}
+
+.phase-diagram-point circle {
+  stroke: rgba(8, 17, 31, 0.9);
+  stroke-width: 4;
+}
+
+.phase-diagram-segment {
+  fill: none;
+  stroke: url(#phaseLineGradient);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.phase-diagram-segment--flat {
+  stroke-width: 8;
+}
+
+.phase-diagram-plateau {
+  stroke: rgba(8, 17, 31, 0.18);
+  stroke-width: 1;
+}
+
+.phase-diagram-plateau--descent {
+  fill: rgba(118, 228, 214, 0.55);
+}
+
+.phase-diagram-plateau--bottom {
+  fill: rgba(255, 184, 107, 0.9);
+}
+
+.phase-diagram-plateau--stop {
+  fill: rgba(247, 204, 116, 0.95);
+}
+
+.phase-diagram-plateau--ascent {
+  fill: rgba(138, 180, 255, 0.55);
+}
+
+.phase-diagram-plateau--surfaceInterval,
+.phase-diagram-plateau--surface {
+  fill: rgba(156, 176, 209, 0.72);
+}
+
+.phase-diagram-relationship rect {
+  fill: rgba(8, 17, 31, 0.88);
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+.phase-diagram-relationship text {
+  fill: var(--text);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.phase-diagram-relationship--consécutive rect {
+  fill: rgba(118, 228, 214, 0.16);
+}
+
+.phase-diagram-relationship--successive rect {
+  fill: rgba(138, 180, 255, 0.16);
+}
+
+.phase-diagram-point-number {
+  fill: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.phase-diagram-legend-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.phase-diagram {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.phase-diagram-item {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: 0.8rem;
+  align-items: start;
+}
+
+.phase-diagram-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.phase-diagram-index--surface {
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+}
+
+.phase-diagram-body {
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.phase-diagram-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.phase-diagram-head strong {
+  display: block;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.phase-diagram-head span {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.phase-diagram-duration {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.phase-diagram-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.phase-diagram-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--width);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent-3));
+}
+
+.phase-diagram-fill--descent {
+  background: linear-gradient(90deg, rgba(118, 228, 214, 0.95), rgba(138, 180, 255, 0.85));
+}
+
+.phase-diagram-fill--bottom {
+  background: linear-gradient(90deg, rgba(255, 184, 107, 0.95), rgba(247, 204, 116, 0.85));
+}
+
+.phase-diagram-fill--stop {
+  background: linear-gradient(90deg, rgba(247, 204, 116, 0.95), rgba(255, 184, 107, 0.85));
+}
+
+.phase-diagram-fill--ascent {
+  background: linear-gradient(90deg, rgba(138, 180, 255, 0.95), rgba(118, 228, 214, 0.85));
+}
+
+.phase-diagram-fill--surfaceInterval,
+.phase-diagram-fill--surface {
+  background: linear-gradient(90deg, rgba(156, 176, 209, 0.95), rgba(118, 228, 214, 0.75));
 }
 
 .phase-table-wrap {
@@ -598,6 +982,18 @@ output {
 
   .phase-table {
     min-width: 1280px;
+  }
+
+  .phase-diagram-head {
+    flex-direction: column;
+  }
+
+  .phase-diagram-chart-head {
+    flex-direction: column;
+  }
+
+  .phase-diagram-chart-legend {
+    justify-content: flex-start;
   }
 
   .timeline-item {

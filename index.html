@@ -30,20 +30,6 @@
             <strong>Important :</strong> ce simulateur est éducatif et applique un modèle historique simplifié de Haldane. Il ne remplace pas une table officielle, un ordinateur de plongée ni une formation.
           </div>
         </div>
-        <div class="hero-panel">
-          <div class="stat">
-            <span>Profondeur</span>
-            <strong id="summaryDepth">30 m</strong>
-          </div>
-          <div class="stat">
-            <span>Temps fond</span>
-            <strong id="summaryTime">20 min</strong>
-          </div>
-          <div class="stat">
-            <span>Résultat</span>
-            <strong id="summaryResult">Palier(s) nécessaire(s)</strong>
-          </div>
-        </div>
       </section>
 
       <section class="grid">
@@ -89,45 +75,54 @@
             <div class="subsection-head">
               <h3>Deuxième plongée</h3>
               <label class="toggle-row">
-                <input id="secondDiveEnabled" type="checkbox" checked />
+                <input id="secondDiveEnabled" type="checkbox" />
                 <span>Activer</span>
               </label>
             </div>
 
-            <label class="field">
-              <span>Intervalle surface</span>
-              <div class="field-row">
-                <input id="surfaceInterval" type="range" min="0" max="720" step="1" value="60" />
-                <output id="surfaceIntervalValue">60 min</output>
-              </div>
-            </label>
+            <div id="secondDiveParams" class="second-dive-params">
+              <label class="field">
+                <span>Intervalle surface</span>
+                <div class="field-row">
+                  <input id="surfaceInterval" type="range" min="0" max="720" step="1" value="60" />
+                  <output id="surfaceIntervalValue">60 min</output>
+                </div>
+              </label>
 
-            <label class="field">
-              <span>Profondeur seconde plongée</span>
-              <div class="field-row">
-                <input id="secondDepth" type="range" min="6" max="60" step="1" value="20" />
-                <output id="secondDepthValue">20 m</output>
-              </div>
-            </label>
+              <label class="field">
+                <span>Profondeur seconde plongée</span>
+                <div class="field-row">
+                  <input id="secondDepth" type="range" min="6" max="60" step="1" value="20" />
+                  <output id="secondDepthValue">20 m</output>
+                </div>
+              </label>
 
-            <label class="field">
-              <span>Temps seconde plongée</span>
-              <div class="field-row">
-                <input id="secondTime" type="range" min="5" max="180" step="1" value="25" />
-                <output id="secondTimeValue">25 min</output>
-              </div>
-            </label>
+              <label class="field">
+                <span>Temps seconde plongée</span>
+                <div class="field-row">
+                  <input id="secondTime" type="range" min="5" max="180" step="1" value="25" />
+                  <output id="secondTimeValue">25 min</output>
+                </div>
+              </label>
 
-            <p class="helper-text">Si l'intervalle de surface est inférieur à 15 min, la série est traitée comme une plongée consécutive; au-delà, elle est traitée comme une plongée successive avec azote résiduel.</p>
+              <p class="helper-text">Si l'intervalle de surface est inférieur à 15 min, la série est traitée comme une plongée consécutive; au-delà, elle est traitée comme une plongée successive avec azote résiduel.</p>
+
+              <div class="subsection subsection--nested">
+                <div class="subsection-head">
+                  <h3>Plongée additionnelle</h3>
+                </div>
+
+                <div id="additionalDives" class="additional-dives"></div>
+              </div>
+            </div>
           </div>
 
-          <button id="resetButton" class="button-secondary" type="button">Recharger un exemple</button>
         </section>
 
         <section class="card explanation">
           <div class="section-head">
             <h2>Explication du calcul</h2>
-            <p>Le moteur applique l'équation exponentielle de Haldane sur chaque compartiment.</p>
+            <p>Le moteur applique les mêmes équations sur chaque compartiment, avec des variables explicitées pour suivre la logique du calcul.</p>
           </div>
 
           <ol id="steps" class="steps"></ol>
@@ -135,23 +130,36 @@
           <div class="formula-block">
             <div class="formula-title">Formules utilisées</div>
             <div class="formula-lines">
-              <div>P<sub>tissu</sub>(t) = P<sub>i</sub> + (P<sub>0</sub> - P<sub>i</sub>)e<sup>-kt</sup></div>
-              <div>P<sub>tissu</sub>(t) = P<sub>i</sub>(t) - R/k + (P<sub>0</sub> - P<sub>i</sub>(0) + R/k)e<sup>-kt</sup></div>
-              <div>Critère Haldane: P<sub>tissu</sub> ≤ 2 × P<sub>ambiante</sub></div>
+              <div class="formula-card">
+                <div class="formula-equation">P<sub>ambiante</sub> = 1 + profondeur / 10</div>
+                <div class="formula-note">La pression absolue augmente d'environ 1 bar tous les 10 m.</div>
+              </div>
+              <div class="formula-card">
+                <div class="formula-equation">P<sub>tissu</sub>(t) = P<sub>i</sub> + (P<sub>0</sub> - P<sub>i</sub>)e<sup>-kt</sup></div>
+                <div class="formula-note">Phase à pression constante: P<sub>i</sub> est la pression inspirée, P<sub>0</sub> la tension de départ, k = ln(2) / demi-vie et t le temps.</div>
+              </div>
+              <div class="formula-card">
+                <div class="formula-equation">P<sub>tissu</sub>(t) = P<sub>i</sub>(t) - R/k + (P<sub>0</sub> - P<sub>i</sub>(0) + R/k)e<sup>-kt</sup></div>
+                <div class="formula-note">Phase en mouvement: R est le taux de variation de la pression inspirée pendant la descente ou la remontée.</div>
+              </div>
+              <div class="formula-card">
+                <div class="formula-equation">P<sub>tissu</sub> ≤ 2 × P<sub>ambiante</sub></div>
+                <div class="formula-note">Si un tissu dépasse cette limite, le plafond théorique monte et un palier devient nécessaire.</div>
+              </div>
             </div>
           </div>
         </section>
       </section>
 
-      <section class="grid grid-wide">
-        <section class="card result">
-          <div class="section-head">
-            <h2>Profil de remontée</h2>
-            <p>Le profil complet inclut la descente, le fond et les phases de remontée réellement calculées à partir des tissus.</p>
-          </div>
-          <div id="timeline" class="timeline"></div>
-        </section>
+      <section class="card phase-diagram-panel">
+        <div class="section-head">
+          <h2>Schéma des phases</h2>
+          <p>Vue séquentielle du profil avec, pour chaque phase, la profondeur atteinte et la durée calculée.</p>
+        </div>
+        <div id="phaseDiagram" class="phase-diagram"></div>
+      </section>
 
+      <section class="grid grid-wide">
         <section class="card result">
           <div class="section-head">
             <h2>Résultats clés</h2>
