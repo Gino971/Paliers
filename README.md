@@ -1,4 +1,4 @@
-# Palier
+# Paliers
 
 Simulateur web autonome en français pour expliquer, de façon pédagogique, comment un profil de plongée peut conduire à des paliers.
 
