@@ -73,6 +73,44 @@
 
         <div class="subsection">
           <div class="subsection-head">
+            <h3>Mélange respiratoire</h3>
+          </div>
+
+          <label class="field">
+            <span>Type de mélange</span>
+            <div class="field-row">
+              <select id="mixPreset">
+                <option value="air">Air</option>
+                <option value="nitrox32">Nitrox 32</option>
+                <option value="trimix2135">Trimix 21/35</option>
+                <option value="custom">Personnalisé</option>
+              </select>
+              <output id="mixSummaryValue">O2 21 % • He 0 % • N2 79 %</output>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Oxygène</span>
+            <div class="field-row">
+              <input id="oxygenPercent" type="range" min="10" max="50" step="1" value="21" />
+              <output id="oxygenPercentValue">21 %</output>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Hélium</span>
+            <div class="field-row">
+              <input id="heliumPercent" type="range" min="0" max="70" step="1" value="0" />
+              <output id="heliumPercentValue">0 %</output>
+            </div>
+          </label>
+
+          <p class="helper-text">Le calcul reste pédagogique: l'hélium réduit ici la charge inertielle modélisée de façon simplifiée.</p>
+          <div id="oxygenWarning" class="mix-warning" role="status" aria-live="polite"></div>
+        </div>
+
+        <div class="subsection">
+          <div class="subsection-head">
             <h3>Deuxième plongée</h3>
             <label class="toggle-row">
               <input id="secondDiveEnabled" type="checkbox" />

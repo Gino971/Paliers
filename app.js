@@ -3,6 +3,9 @@ const defaults = {
   time: 20,
   descentRate: 20,
   ascentRate: 10,
+  mixPreset: "air",
+  oxygenPercent: 21,
+  heliumPercent: 0,
   secondDiveEnabled: false,
   surfaceInterval: 60,
   secondDepth: 20,
@@ -40,17 +43,27 @@ const compartments = [
 ];
 
 const WATER_VAPOR_PRESSURE = 0.0627;
-const N2_FRACTION = 0.79;
+const HELIUM_EFFECT_FACTOR = 0.5;
 const HALDANE_RATIO = 2;
 const STEP_SIZE = 3;
 const EPSILON = 1e-6;
 const MAX_SEARCH_MINUTES = 600;
+const HYPEROXIA_PP_THRESHOLD = 1.4;
+const HYPOXIA_PP_THRESHOLD = 0.16;
+const NARCOSIS_PP_THRESHOLD = 3.2;
+const GAS_DENSITY_THRESHOLD = 6.0;
+const OXYGEN_DENSITY = 1.429;
+const NITROGEN_DENSITY = 1.251;
+const HELIUM_DENSITY = 0.1786;
 
 const elements = {
   depth: document.getElementById("depth"),
   time: document.getElementById("time"),
   descentRate: document.getElementById("descentRate"),
   ascentRate: document.getElementById("ascentRate"),
+  mixPreset: document.getElementById("mixPreset"),
+  oxygenPercent: document.getElementById("oxygenPercent"),
+  heliumPercent: document.getElementById("heliumPercent"),
   secondDiveEnabled: document.getElementById("secondDiveEnabled"),
   surfaceInterval: document.getElementById("surfaceInterval"),
   secondDepth: document.getElementById("secondDepth"),
@@ -59,6 +72,10 @@ const elements = {
   timeValue: document.getElementById("timeValue"),
   descentRateValue: document.getElementById("descentRateValue"),
   ascentRateValue: document.getElementById("ascentRateValue"),
+  mixSummaryValue: document.getElementById("mixSummaryValue"),
+  oxygenPercentValue: document.getElementById("oxygenPercentValue"),
+  heliumPercentValue: document.getElementById("heliumPercentValue"),
+  oxygenWarning: document.getElementById("oxygenWarning"),
   surfaceIntervalValue: document.getElementById("surfaceIntervalValue"),
   secondDepthValue: document.getElementById("secondDepthValue"),
   secondTimeValue: document.getElementById("secondTimeValue"),
@@ -106,8 +123,211 @@ function formatDepth(value) {
   return `${value.toFixed(1)} m`;
 }
 
+function formatPercent(value) {
+  return `${Math.round(value)} %`;
+}
+
 function formatStopLabel(duration, depth) {
   return `Palier ${formatStopMinutes(duration)} à ${formatDepth(depth)}`;
+}
+
+function getMixPresets() {
+  return {
+    air: { oxygenPercent: 21, heliumPercent: 0 },
+    nitrox32: { oxygenPercent: 32, heliumPercent: 0 },
+    trimix2135: { oxygenPercent: 21, heliumPercent: 35 },
+  };
+}
+
+function getMixPresetName(oxygenPercent, heliumPercent) {
+  const presets = getMixPresets();
+  for (const [name, preset] of Object.entries(presets)) {
+    if (preset.oxygenPercent === oxygenPercent && preset.heliumPercent === heliumPercent) {
+      return name;
+    }
+  }
+
+  return "custom";
+}
+
+function getGasMixFromInputs() {
+  const oxygenPercent = Number(elements.oxygenPercent.value);
+  const heliumPercent = Number(elements.heliumPercent.value);
+  return {
+    oxygenPercent,
+    heliumPercent,
+    nitrogenPercent: Math.max(0, 100 - oxygenPercent - heliumPercent),
+    modeledInertFraction: Math.max(0, (100 - oxygenPercent - heliumPercent * HELIUM_EFFECT_FACTOR) / 100),
+  };
+}
+
+function formatGasMixSummary(gasMix) {
+  return `O2 ${Math.round(gasMix.oxygenPercent)} % • He ${Math.round(gasMix.heliumPercent)} % • N2 ${Math.round(gasMix.nitrogenPercent)} %`;
+}
+
+function getInspiredPartialPressure(depth, fraction) {
+  return Math.max(0, (ambientPressure(depth) - WATER_VAPOR_PRESSURE) * fraction);
+}
+
+function getOxygenPartialPressure(depth, oxygenPercent) {
+  return getInspiredPartialPressure(depth, oxygenPercent / 100);
+}
+
+function getMaxPlannedDepth(primaryDepth, secondDiveEnabled, secondDepth, additionalDives) {
+  const depths = [primaryDepth];
+  if (secondDiveEnabled) {
+    depths.push(secondDepth);
+  }
+
+  additionalDives.forEach((dive) => {
+    if (dive.enabled) {
+      depths.push(dive.depth);
+    }
+  });
+
+  return Math.max(...depths, 0);
+}
+
+function getOxygenWarningText(gasMix, maxPlannedDepth) {
+  const ppO2 = getOxygenPartialPressure(maxPlannedDepth, gasMix.oxygenPercent);
+  const threshold = HYPEROXIA_PP_THRESHOLD;
+  const maxOperatingDepth = gasMix.oxygenPercent <= 0 ? 0 : Math.max(0, ((threshold / (gasMix.oxygenPercent / 100)) + WATER_VAPOR_PRESSURE - 1) * 10);
+
+  if (ppO2 > threshold + 1e-6) {
+    return `Avertissement hyperoxyque: à ${formatDepth(maxPlannedDepth)}, la pression partielle d'O2 atteint ${ppO2.toFixed(2)} bar, au-dessus du seuil de ${threshold.toFixed(1)} bar. MOD approx. à ${formatDepth(maxOperatingDepth)}.`;
+  }
+
+  return `Pression partielle d'O2 à ${formatDepth(maxPlannedDepth)}: ${ppO2.toFixed(2)} bar. Seuil hyperoxyque de ${threshold.toFixed(1)} bar non dépassé. MOD approx. à ${formatDepth(maxOperatingDepth)}.`;
+}
+
+function isHyperoxic(gasMix, maxPlannedDepth) {
+  return getOxygenPartialPressure(maxPlannedDepth, gasMix.oxygenPercent) > HYPEROXIA_PP_THRESHOLD + 1e-6;
+}
+
+function getGasDensity(gasMix, depth) {
+  const surfaceDensity = (gasMix.oxygenPercent / 100) * OXYGEN_DENSITY
+    + (gasMix.nitrogenPercent / 100) * NITROGEN_DENSITY
+    + (gasMix.heliumPercent / 100) * HELIUM_DENSITY;
+
+  return surfaceDensity * ambientPressure(depth);
+}
+
+function buildGasDiagnostics(gasMix, maxPlannedDepth, rawGasMix) {
+  const diagnostics = [];
+  const ppO2 = getOxygenPartialPressure(maxPlannedDepth, gasMix.oxygenPercent);
+  const maxOperatingDepth = gasMix.oxygenPercent <= 0 ? 0 : Math.max(0, ((HYPEROXIA_PP_THRESHOLD / (gasMix.oxygenPercent / 100)) + WATER_VAPOR_PRESSURE - 1) * 10);
+
+  diagnostics.push({
+    tone: ppO2 > HYPEROXIA_PP_THRESHOLD + EPSILON ? "danger" : "safe",
+    title: "Hyperoxie",
+    text: ppO2 > HYPEROXIA_PP_THRESHOLD + EPSILON
+      ? `À ${formatDepth(maxPlannedDepth)}, la pression partielle d'O2 atteint ${ppO2.toFixed(2)} bar, au-dessus du seuil de ${HYPEROXIA_PP_THRESHOLD.toFixed(1)} bar. MOD approx. à ${formatDepth(maxOperatingDepth)}.`
+      : `À ${formatDepth(maxPlannedDepth)}, la pression partielle d'O2 reste à ${ppO2.toFixed(2)} bar. MOD approx. à ${formatDepth(maxOperatingDepth)}.`,
+  });
+
+  const surfacePpO2 = getOxygenPartialPressure(0, gasMix.oxygenPercent);
+  if (surfacePpO2 < HYPOXIA_PP_THRESHOLD - EPSILON) {
+    diagnostics.push({
+      tone: "danger",
+      title: "Hypoxie",
+      text: `En surface, la pression partielle d'O2 tombe à ${surfacePpO2.toFixed(2)} bar, sous le seuil de ${HYPOXIA_PP_THRESHOLD.toFixed(2)} bar. Le gaz est trop pauvre en oxygène pour l'usage prévu.`,
+    });
+  }
+
+  const ppN2 = getInspiredPartialPressure(maxPlannedDepth, gasMix.nitrogenPercent / 100);
+  if (ppN2 > NARCOSIS_PP_THRESHOLD + EPSILON) {
+    diagnostics.push({
+      tone: "warning",
+      title: "Narcose azotée",
+      text: `À ${formatDepth(maxPlannedDepth)}, la pression partielle d'azote atteint ${ppN2.toFixed(2)} bar. Au-delà de ${NARCOSIS_PP_THRESHOLD.toFixed(1)} bar, la narcose devient plus probable.`,
+    });
+  }
+
+  const density = getGasDensity(gasMix, maxPlannedDepth);
+  if (density > GAS_DENSITY_THRESHOLD + EPSILON) {
+    diagnostics.push({
+      tone: "warning",
+      title: "Densité respiratoire",
+      text: `La densité estimée du mélange atteint ${density.toFixed(2)} g/L à ${formatDepth(maxPlannedDepth)}. Au-dessus de ${GAS_DENSITY_THRESHOLD.toFixed(1)} g/L, la respiration devient sensiblement plus coûteuse.`,
+    });
+  }
+
+  const rawTotal = rawGasMix.oxygenPercent + rawGasMix.heliumPercent;
+  if (rawTotal > 100 + EPSILON) {
+    diagnostics.push({
+      tone: "danger",
+      title: "Cohérence du mélange",
+      text: `O2 + He dépasse 100 % (${rawTotal.toFixed(0)} %). Le mélange saisi est incohérent et doit être corrigé.`,
+    });
+  } else {
+    diagnostics.push({
+      tone: "safe",
+      title: "Cohérence du mélange",
+      text: `O2 + He = ${rawTotal.toFixed(0)} %. L'azote résiduel est calculé à ${Math.round(gasMix.nitrogenPercent)} %.`,
+    });
+  }
+
+  return diagnostics;
+}
+
+function renderGasDiagnostics(gasMix, maxPlannedDepth, rawGasMix) {
+  if (!elements.oxygenWarning) {
+    return;
+  }
+
+  const diagnostics = buildGasDiagnostics(gasMix, maxPlannedDepth, rawGasMix);
+  elements.oxygenWarning.innerHTML = `
+    <div class="mix-warning__title">Diagnostics du mélange</div>
+    <div class="mix-warning__list">
+      ${diagnostics.map((diagnostic) => `
+        <div class="mix-warning__item mix-warning__item--${diagnostic.tone}">
+          <strong>${diagnostic.title}</strong>
+          <span>${diagnostic.text}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+
+  elements.oxygenWarning.classList.toggle("mix-warning--danger", diagnostics.some((diagnostic) => diagnostic.tone === "danger"));
+  elements.oxygenWarning.classList.toggle("mix-warning--safe", !diagnostics.some((diagnostic) => diagnostic.tone === "danger"));
+}
+
+function syncGasMixBounds() {
+  const oxygenPercent = Number(elements.oxygenPercent.value);
+  const heliumMax = Math.max(0, 100 - oxygenPercent);
+  elements.heliumPercent.max = String(heliumMax);
+  if (Number(elements.heliumPercent.value) > heliumMax) {
+    elements.heliumPercent.value = String(heliumMax);
+  }
+
+  const heliumPercent = Number(elements.heliumPercent.value);
+  const oxygenMax = Math.max(0, 100 - heliumPercent);
+  elements.oxygenPercent.max = String(oxygenMax);
+  if (Number(elements.oxygenPercent.value) > oxygenMax) {
+    elements.oxygenPercent.value = String(oxygenMax);
+  }
+}
+
+function syncGasMixPreset() {
+  elements.mixPreset.value = getMixPresetName(Number(elements.oxygenPercent.value), Number(elements.heliumPercent.value));
+}
+
+function syncGasMixOutputs() {
+  syncGasMixBounds();
+  syncGasMixPreset();
+  const gasMix = getGasMixFromInputs();
+  elements.oxygenPercentValue.textContent = formatPercent(gasMix.oxygenPercent);
+  elements.heliumPercentValue.textContent = formatPercent(gasMix.heliumPercent);
+  elements.mixSummaryValue.textContent = formatGasMixSummary(gasMix);
+  state.gasMix = gasMix;
+  return gasMix;
+}
+
+function applyGasMixPreset(presetName) {
+  const preset = getMixPresets()[presetName] || getMixPresets().air;
+  elements.oxygenPercent.value = String(preset.oxygenPercent);
+  elements.heliumPercent.value = String(preset.heliumPercent);
+  syncGasMixOutputs();
 }
 
 function cloneDive(dive) {
@@ -184,7 +404,8 @@ function ambientPressure(depth) {
 }
 
 function inspiredN2Pressure(depth) {
-  return Math.max(0, (ambientPressure(depth) - WATER_VAPOR_PRESSURE) * N2_FRACTION);
+  const gasMix = state.gasMix || getGasMixFromInputs();
+  return Math.max(0, (ambientPressure(depth) - WATER_VAPOR_PRESSURE) * gasMix.modeledInertFraction);
 }
 
 function halfTimeConstant(halfTime) {
@@ -563,9 +784,10 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
   };
 }
 
-function buildExplanation(depth, time, descentRate, ascentRate, model) {
+function buildExplanation(depth, time, descentRate, ascentRate, model, gasMix) {
+  const mixSummary = formatGasMixSummary(gasMix);
   const lines = [
-    `1. On initialise les ${compartments.length} compartiments MN90 à la tension d'azote inspiré en surface: ${formatTension(inspiredN2Pressure(0))}.`,
+    `1. On initialise les ${compartments.length} compartiments MN90 à la tension inspirée en surface pour ${mixSummary}: ${formatTension(inspiredN2Pressure(0))}.`,
     `2. La descente de 0 à ${depth} m est suivie avec la formule de Schreiner, puis le fond dure ${time} min.`,
     `3. Chaque compartiment suit P_tissu(t) = P_i + (P_0 - P_i)e^{-kt} en pression constante, avec k = ln(2) / T1/2.`,
     `4. Pour la remontée, on recalcule les tensions à chaque phase: arrivée au palier, attente au palier, puis départ vers la phase suivante. Le critère reste P_tissu ≤ 2 × P_ambiante.`,
@@ -953,17 +1175,18 @@ function buildPhaseTable(model) {
   `;
 }
 
-function buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth, secondTime, surfaceInterval) {
+function buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth, secondTime, surfaceInterval, gasMix) {
   const model = sequence.finalModel;
   const surfaceInspired = inspiredN2Pressure(0);
   const depthInspired = inspiredN2Pressure(depth);
+  const mixSummary = formatGasMixSummary(gasMix);
   const descentMinutes = depth / descentRate;
   const directAscentMinutes = depth / ascentRate;
 
   const items = [
     {
       title: "1. Pression inspirée en surface",
-      text: `On part de ${formatTension(surfaceInspired)} d'azote inspiré à la surface, calculé à partir de l'air sec corrigé par la vapeur d'eau.`,
+      text: `On part de ${formatTension(surfaceInspired)} d'azote inspiré à la surface, calculé à partir de ${mixSummary} et corrigé par la vapeur d'eau.`,
     },
     {
       title: "2. Descente",
@@ -1135,6 +1358,11 @@ function render() {
   const time = Number(elements.time.value);
   const descentRate = Number(elements.descentRate.value);
   const ascentRate = Number(elements.ascentRate.value);
+  const rawGasMix = {
+    oxygenPercent: Number(elements.oxygenPercent.value),
+    heliumPercent: Number(elements.heliumPercent.value),
+  };
+  const gasMix = syncGasMixOutputs();
   const secondDiveEnabled = elements.secondDiveEnabled.checked;
   const surfaceInterval = Number(elements.surfaceInterval.value);
   const secondDepth = Number(elements.secondDepth.value);
@@ -1151,6 +1379,7 @@ function render() {
     state.additionalDives
   );
   const model = sequence.finalModel;
+  const maxPlannedDepth = getMaxPlannedDepth(depth, secondDiveEnabled, secondDepth, state.additionalDives);
 
   syncSecondDiveParamsVisibility(secondDiveEnabled);
   elements.additionalDives.innerHTML = buildAdditionalDiveBlocks();
@@ -1158,6 +1387,7 @@ function render() {
   updateAdditionalDiveFieldVisibility();
 
   syncVisibleSliderValues();
+  renderGasDiagnostics(gasMix, maxPlannedDepth, rawGasMix);
 
   elements.pressureValue.textContent = formatPressure(sequence.primaryModel.pressure);
   elements.ndlValue.textContent = formatMinutes(sequence.primaryModel.ndl);
@@ -1168,7 +1398,7 @@ function render() {
   elements.ascentTimeValue.textContent = formatMinutes(sequence.combinedAscentTime);
   elements.runtimeValue.textContent = formatMinutes(sequence.combinedRuntime);
 
-  elements.steps.innerHTML = buildExplanation(depth, time, descentRate, ascentRate, model)
+  elements.steps.innerHTML = buildExplanation(depth, time, descentRate, ascentRate, model, gasMix)
     .map((step) => `<li>${step}</li>`)
     .join("");
 
@@ -1189,7 +1419,7 @@ function render() {
   const phaseTableElement = document.getElementById("phaseTable");
   phaseTableElement.innerHTML = buildPhaseTable(sequence);
 
-  const courseItems = buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth, secondTime, surfaceInterval);
+  const courseItems = buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth, secondTime, surfaceInterval, gasMix);
   const courseElement = document.getElementById("course");
   courseElement.innerHTML = courseItems
     .map(
@@ -1202,6 +1432,22 @@ function render() {
     )
     .join("");
 }
+
+elements.mixPreset.addEventListener("change", (event) => {
+  applyGasMixPreset(event.target.value);
+  render();
+});
+
+elements.oxygenPercent.addEventListener("input", () => {
+  syncGasMixOutputs();
+});
+
+elements.heliumPercent.addEventListener("input", () => {
+  syncGasMixOutputs();
+});
+
+elements.oxygenPercent.addEventListener("change", render);
+elements.heliumPercent.addEventListener("change", render);
 
 elements.depth.addEventListener("input", syncVisibleSliderValues);
 elements.time.addEventListener("input", syncVisibleSliderValues);
