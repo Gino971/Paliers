@@ -671,8 +671,21 @@ function getPhaseDiagramLegendText(phase, index) {
   return `${number}. ${phase.label}`;
 }
 
-function getPhaseDiagramTooltipText(phase, index, duration) {
-  const parts = [`Durée: ${formatMinutes(duration)}`];
+function getPhaseDiagramPhaseText(sequence, phase, index, duration) {
+  const parts = [];
+  const startSnapshot = sequence.phaseSnapshots[index]?.snapshot;
+  const endSnapshot = sequence.phaseSnapshots[index + 1]?.snapshot;
+
+  parts.push(getPhaseDiagramNumber(index));
+
+  if (startSnapshot && endSnapshot) {
+    const startControl = getControllingTissue(startSnapshot);
+    const endControl = getControllingTissue(endSnapshot);
+    parts.push(`TN2 directeur début: ${formatTension(startControl.tension)}`);
+    parts.push(`TN2 directeur fin: ${formatTension(endControl.tension)}`);
+  }
+
+  parts.push(`Durée: ${formatMinutes(duration)}`);
 
   if (phase.kind === "surfaceInterval") {
     parts.push(`Type: ${phase.relationship === "consécutive" ? "plongée consécutive" : "plongée successive"}`);
@@ -683,10 +696,14 @@ function getPhaseDiagramTooltipText(phase, index, duration) {
   } else if (phase.kind === "bottom") {
     parts.push(`Profondeur: ${formatDepth(phase.depth)}`);
   } else if (phase.kind === "stop") {
-    parts[0] = formatStopLabel(duration, phase.depth);
+    parts[parts.length - 1] = formatStopLabel(duration, phase.depth);
   }
 
-  return `${getPhaseDiagramNumber(index)} • ${parts.join(" • ")}`;
+  return parts.join(" • ");
+}
+
+function getPhaseDiagramTooltipText(sequence, phase, index, duration) {
+  return getPhaseDiagramPhaseText(sequence, phase, index, duration);
 }
 
 function getSelectedPhaseDiagramText(sequence, selectedIndex) {
@@ -695,7 +712,7 @@ function getSelectedPhaseDiagramText(sequence, selectedIndex) {
     return "Touchez une phase du graphique pour afficher ses informations.";
   }
 
-  return getPhaseDiagramTooltipText(phase, selectedIndex, phase.duration);
+  return getPhaseDiagramPhaseText(sequence, phase, selectedIndex, phase.duration);
 }
 
 function buildPhaseDiagram(sequence) {
@@ -848,8 +865,8 @@ function buildPhaseDiagram(sequence) {
           ${segments
             .map(
               (segment, index) => `
-                <g class="phase-diagram-segment-group phase-diagram-segment-group--${segment.phase.kind}${index === selectedPhaseIndex ? ' phase-diagram-segment-group--selected' : ''}" data-phase-index="${index}" aria-label="${getPhaseDiagramTooltipText(segment.phase, index, segment.duration)}">
-                  <title>${getPhaseDiagramTooltipText(segment.phase, index, segment.duration)}</title>
+                <g class="phase-diagram-segment-group phase-diagram-segment-group--${segment.phase.kind}${index === selectedPhaseIndex ? ' phase-diagram-segment-group--selected' : ''}" data-phase-index="${index}" aria-label="${getPhaseDiagramTooltipText(sequence, segment.phase, index, segment.duration)}">
+                  <title>${getPhaseDiagramTooltipText(sequence, segment.phase, index, segment.duration)}</title>
                   ${segment.isFlat ? `<rect class="phase-diagram-plateau phase-diagram-plateau--${segment.phase.kind}" x="${segment.plateauX}" y="${segment.plateauY}" width="${segment.plateauWidth}" height="10" rx="5"></rect>` : ""}
                   <line class="phase-diagram-segment phase-diagram-segment--${segment.phase.kind}${segment.isFlat ? ' phase-diagram-segment--flat' : ''}" x1="${segment.xStart}" y1="${segment.yStart}" x2="${segment.xEnd}" y2="${segment.yEnd}"></line>
                   ${segment.relationshipLabel ? `
