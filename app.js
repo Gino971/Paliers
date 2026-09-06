@@ -681,8 +681,8 @@ function getPhaseDiagramPhaseText(sequence, phase, index, duration) {
   if (startSnapshot && endSnapshot) {
     const startControl = getControllingTissue(startSnapshot);
     const endControl = getControllingTissue(endSnapshot);
-    parts.push(`TN2 directeur début: ${formatTension(startControl.tension)}`);
-    parts.push(`TN2 directeur fin: ${formatTension(endControl.tension)}`);
+    parts.push(`Tissu directeur: ${endControl.label} (${endControl.name})`);
+    parts.push(`TN2 directeur: ${formatTension(startControl.tension)} → ${formatTension(endControl.tension)}`);
   }
 
   parts.push(`Durée: ${formatMinutes(duration)}`);
