@@ -848,7 +848,7 @@ function buildPhaseDiagram(sequence) {
           ${segments
             .map(
               (segment, index) => `
-                <g class="phase-diagram-segment-group phase-diagram-segment-group--${segment.phase.kind}${index === selectedPhaseIndex ? ' phase-diagram-segment-group--selected' : ''}" data-phase-index="${index}" tabindex="0" role="button" aria-label="${getPhaseDiagramTooltipText(segment.phase, index, segment.duration)}">
+                <g class="phase-diagram-segment-group phase-diagram-segment-group--${segment.phase.kind}${index === selectedPhaseIndex ? ' phase-diagram-segment-group--selected' : ''}" data-phase-index="${index}" aria-label="${getPhaseDiagramTooltipText(segment.phase, index, segment.duration)}">
                   <title>${getPhaseDiagramTooltipText(segment.phase, index, segment.duration)}</title>
                   ${segment.isFlat ? `<rect class="phase-diagram-plateau phase-diagram-plateau--${segment.phase.kind}" x="${segment.plateauX}" y="${segment.plateauY}" width="${segment.plateauWidth}" height="10" rx="5"></rect>` : ""}
                   <line class="phase-diagram-segment phase-diagram-segment--${segment.phase.kind}${segment.isFlat ? ' phase-diagram-segment--flat' : ''}" x1="${segment.xStart}" y1="${segment.yStart}" x2="${segment.xEnd}" y2="${segment.yEnd}"></line>
