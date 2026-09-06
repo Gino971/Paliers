@@ -686,7 +686,7 @@ function getPhaseDiagramTooltipText(phase, index, duration) {
     parts[0] = formatStopLabel(duration, phase.depth);
   }
 
-  return parts.join(" • ");
+  return `${getPhaseDiagramNumber(index)} • ${parts.join(" • ")}`;
 }
 
 function getSelectedPhaseDiagramText(sequence, selectedIndex) {
