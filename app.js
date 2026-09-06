@@ -824,21 +824,6 @@ function buildPhaseDiagram(sequence) {
   const areaPoints = `${paddingX},${height - paddingY} ${polylinePoints} ${paddingX + totalCompressedWidth},${height - paddingY}`;
 
   return `
-    <div class="phase-diagram-chart">
-      <div class="phase-diagram-chart-head">
-        <div>
-          <strong>Profondeur par phase</strong>
-          <p>La courbe garde l’ordre réel des phases, mais l’espacement horizontal est compressé: une phase longue prend plus de place qu’une phase courte, sans devenir strictement proportionnelle.</p>
-        </div>
-        <div class="phase-diagram-chart-legend">
-          <span class="phase-legend phase-legend--descent">Descente</span>
-          <span class="phase-legend phase-legend--bottom">Fond</span>
-          <span class="phase-legend phase-legend--stop">Palier</span>
-          <span class="phase-legend phase-legend--ascent">Remontée</span>
-          <span class="phase-legend phase-legend--surfaceInterval">Surface</span>
-        </div>
-      </div>
-
       <div class="phase-diagram-scroll">
         <svg class="phase-diagram-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="Graphique des phases avec profondeur et durée">
           <defs>
@@ -890,28 +875,6 @@ function buildPhaseDiagram(sequence) {
         <p>${getSelectedPhaseDiagramText(sequence, Math.min(state.phaseDiagramSelectedIndex, sequence.phases.length - 1))}</p>
       </div>
       <div class="phase-diagram-axis-label">Temps écoulé (min, échelle schématique)</div>
-    </div>
-
-    <div class="phase-diagram-legend-list">
-      ${segments
-        .map(
-          (segment, index) => `
-            <article class="phase-diagram-item phase-diagram-item--${segment.phase.kind}">
-              <div class="phase-diagram-index">${getPhaseDiagramNumber(index)}</div>
-              <div class="phase-diagram-body">
-                <div class="phase-diagram-head">
-                  <div>
-                    <strong>${getPhaseDiagramLegendText(segment.phase, index)}</strong>
-                    <span>${buildPhaseDepthText(segment.phase)}</span>
-                  </div>
-                  <div class="phase-diagram-duration">${formatMinutes(segment.duration)}</div>
-                </div>
-                <div class="phase-diagram-bar"><span class="phase-diagram-fill phase-diagram-fill--${segment.phase.kind}" style="--width:${Math.max(10, Math.round((segment.duration / totalDuration) * 100))}%"></span></div>
-              </div>
-            </article>
-          `
-        )
-        .join("")}
     </div>
   `;
 }
@@ -1190,8 +1153,6 @@ function render() {
     state.additionalDives
   );
   const model = sequence.finalModel;
-  const phaseDiagramScroll = elements.phaseDiagram.querySelector(".phase-diagram-scroll");
-  const previousPhaseDiagramScrollLeft = phaseDiagramScroll instanceof HTMLElement ? phaseDiagramScroll.scrollLeft : 0;
 
   syncSecondDiveParamsVisibility(secondDiveEnabled);
   elements.additionalDives.innerHTML = buildAdditionalDiveBlocks();
@@ -1213,11 +1174,16 @@ function render() {
     .map((step) => `<li>${step}</li>`)
     .join("");
 
-  elements.phaseDiagram.innerHTML = buildPhaseDiagram(sequence);
+  if (elements.phaseDiagram) {
+    const phaseDiagramScroll = elements.phaseDiagram.querySelector(".phase-diagram-scroll");
+    const previousPhaseDiagramScrollLeft = phaseDiagramScroll instanceof HTMLElement ? phaseDiagramScroll.scrollLeft : 0;
 
-  const nextPhaseDiagramScroll = elements.phaseDiagram.querySelector(".phase-diagram-scroll");
-  if (nextPhaseDiagramScroll instanceof HTMLElement) {
-    nextPhaseDiagramScroll.scrollLeft = previousPhaseDiagramScrollLeft;
+    elements.phaseDiagram.innerHTML = buildPhaseDiagram(sequence);
+
+    const nextPhaseDiagramScroll = elements.phaseDiagram.querySelector(".phase-diagram-scroll");
+    if (nextPhaseDiagramScroll instanceof HTMLElement) {
+      nextPhaseDiagramScroll.scrollLeft = previousPhaseDiagramScrollLeft;
+    }
   }
 
   renderTissues(model.bottomSnapshot, model.maxCeiling);
@@ -1281,45 +1247,47 @@ elements.additionalDives.addEventListener("change", (event) => {
   render();
 });
 
-elements.phaseDiagram.addEventListener("click", (event) => {
-  const target = event.target;
-  const segment = target instanceof Element ? target.closest("[data-phase-index]") : null;
-  if (!segment) {
-    return;
-  }
+if (elements.phaseDiagram) {
+  elements.phaseDiagram.addEventListener("click", (event) => {
+    const target = event.target;
+    const segment = target instanceof Element ? target.closest("[data-phase-index]") : null;
+    if (!segment) {
+      return;
+    }
 
-  const phaseIndex = Number(segment.getAttribute("data-phase-index"));
-  if (Number.isNaN(phaseIndex)) {
-    return;
-  }
+    const phaseIndex = Number(segment.getAttribute("data-phase-index"));
+    if (Number.isNaN(phaseIndex)) {
+      return;
+    }
 
-  state.phaseDiagramSelectedIndex = phaseIndex;
-  render();
-});
+    state.phaseDiagramSelectedIndex = phaseIndex;
+    render();
+  });
 
-elements.phaseDiagram.addEventListener("keydown", (event) => {
-  const target = event.target;
-  if (!(target instanceof Element)) {
-    return;
-  }
+  elements.phaseDiagram.addEventListener("keydown", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
 
-  if (event.key !== "Enter" && event.key !== " ") {
-    return;
-  }
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
 
-  const segment = target.closest("[data-phase-index]");
-  if (!segment) {
-    return;
-  }
+    const segment = target.closest("[data-phase-index]");
+    if (!segment) {
+      return;
+    }
 
-  event.preventDefault();
-  const phaseIndex = Number(segment.getAttribute("data-phase-index"));
-  if (Number.isNaN(phaseIndex)) {
-    return;
-  }
+    event.preventDefault();
+    const phaseIndex = Number(segment.getAttribute("data-phase-index"));
+    if (Number.isNaN(phaseIndex)) {
+      return;
+    }
 
-  state.phaseDiagramSelectedIndex = phaseIndex;
-  render();
-});
+    state.phaseDiagramSelectedIndex = phaseIndex;
+    render();
+  });
+}
 
 render();
