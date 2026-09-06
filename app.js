@@ -1173,6 +1173,8 @@ function render() {
     state.additionalDives
   );
   const model = sequence.finalModel;
+  const phaseDiagramScroll = elements.phaseDiagram.querySelector(".phase-diagram-scroll");
+  const previousPhaseDiagramScrollLeft = phaseDiagramScroll instanceof HTMLElement ? phaseDiagramScroll.scrollLeft : 0;
 
   syncSecondDiveParamsVisibility(secondDiveEnabled);
   elements.additionalDives.innerHTML = buildAdditionalDiveBlocks();
@@ -1195,6 +1197,11 @@ function render() {
     .join("");
 
   elements.phaseDiagram.innerHTML = buildPhaseDiagram(sequence);
+
+  const nextPhaseDiagramScroll = elements.phaseDiagram.querySelector(".phase-diagram-scroll");
+  if (nextPhaseDiagramScroll instanceof HTMLElement) {
+    nextPhaseDiagramScroll.scrollLeft = previousPhaseDiagramScrollLeft;
+  }
 
   renderTissues(model.bottomSnapshot, model.maxCeiling);
 
