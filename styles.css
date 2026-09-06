@@ -491,48 +491,6 @@ output {
   margin-bottom: 1.25rem;
 }
 
-.phase-diagram-chart {
-  display: grid;
-  gap: 1rem;
-}
-
-.phase-diagram-chart-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.phase-diagram-chart-head strong {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-size: 1.05rem;
-}
-
-.phase-diagram-chart-head p {
-  color: var(--muted);
-  line-height: 1.55;
-}
-
-.phase-diagram-chart-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.45rem;
-}
-
-.phase-legend {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  font-size: 0.82rem;
-  white-space: nowrap;
-}
-
-.phase-legend--descent,
 .phase-diagram-point--descent circle,
 .phase-diagram-fill--descent {
   fill: #76e4d6;
@@ -613,13 +571,6 @@ output {
   font-size: 11px;
 }
 
-.phase-diagram-axis-label {
-  color: var(--muted);
-  font-size: 0.88rem;
-  text-align: center;
-  margin-top: -0.15rem;
-}
-
 .phase-diagram-point circle {
   stroke: rgba(8, 17, 31, 0.9);
   stroke-width: 4;
@@ -688,44 +639,6 @@ output {
   fill: var(--text);
   font-size: 11px;
   font-weight: 800;
-}
-
-.phase-diagram-segment-group {
-  cursor: pointer;
-}
-
-.phase-diagram-segment-group:focus-visible {
-  outline: none;
-}
-
-.phase-diagram-segment-group--selected .phase-diagram-segment,
-.phase-diagram-segment-group--selected .phase-diagram-plateau,
-.phase-diagram-segment-group--selected .phase-diagram-point circle {
-  filter: drop-shadow(0 0 10px rgba(118, 228, 214, 0.55));
-}
-
-.phase-diagram-info {
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.95rem 1rem;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.phase-diagram-info strong {
-  color: var(--accent);
-  font-size: 0.92rem;
-}
-
-.phase-diagram-info p {
-  color: var(--text);
-  line-height: 1.55;
-}
-
-.phase-diagram-legend-list {
-  display: grid;
-  gap: 0.8rem;
 }
 
 .phase-diagram {
@@ -1017,18 +930,6 @@ output {
     min-width: 1280px;
   }
 
-  .phase-diagram-head {
-    flex-direction: column;
-  }
-
-  .phase-diagram-chart-head {
-    flex-direction: column;
-  }
-
-  .phase-diagram-chart-legend {
-    justify-content: flex-start;
-  }
-
   .timeline-item {
     grid-template-columns: 1fr;
     gap: 0.55rem;
@@ -1059,5 +960,13 @@ output {
   .subsection-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .phase-diagram-panel {
+    padding-bottom: 0.9rem;
+  }
+
+  .phase-diagram-scroll {
+    padding-bottom: 0;
   }
 }
