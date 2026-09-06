@@ -13,6 +13,7 @@ const defaults = {
 };
 
 const state = {
+  phaseDiagramSelectedIndex: 0,
   additionalDives: [
     {
       enabled: false,
@@ -705,9 +706,19 @@ function getPhaseDiagramTooltipText(sequence, phase, index, duration) {
   return getPhaseDiagramPhaseText(sequence, phase, index, duration);
 }
 
+function getSelectedPhaseDiagramText(sequence, selectedIndex) {
+  const phase = sequence.phases[selectedIndex];
+  if (!phase) {
+    return "Touchez une phase du graphique pour afficher ses informations.";
+  }
+
+  return getPhaseDiagramPhaseText(sequence, phase, selectedIndex, phase.duration);
+}
+
 function buildPhaseDiagram(sequence) {
   const phases = sequence.phases;
   const chartPhases = phases;
+  const selectedPhaseIndex = Math.min(Math.max(0, state.phaseDiagramSelectedIndex), Math.max(0, phases.length - 1));
   const height = 360;
   const paddingX = 64;
   const paddingY = 32;
@@ -839,7 +850,7 @@ function buildPhaseDiagram(sequence) {
           ${segments
             .map(
               (segment, index) => `
-                <g class="phase-diagram-segment-group phase-diagram-segment-group--${segment.phase.kind}" aria-label="${getPhaseDiagramTooltipText(sequence, segment.phase, index, segment.duration)}">
+                <g class="phase-diagram-segment-group phase-diagram-segment-group--${segment.phase.kind}${index === selectedPhaseIndex ? ' phase-diagram-segment-group--selected' : ''}" data-phase-index="${index}" aria-label="${getPhaseDiagramTooltipText(sequence, segment.phase, index, segment.duration)}">
                   <title>${getPhaseDiagramTooltipText(sequence, segment.phase, index, segment.duration)}</title>
                   ${segment.isFlat ? `<rect class="phase-diagram-plateau phase-diagram-plateau--${segment.phase.kind}" x="${segment.plateauX}" y="${segment.plateauY}" width="${segment.plateauWidth}" height="10" rx="5"></rect>` : ""}
                   <line class="phase-diagram-segment phase-diagram-segment--${segment.phase.kind}${segment.isFlat ? ' phase-diagram-segment--flat' : ''}" x1="${segment.xStart}" y1="${segment.yStart}" x2="${segment.xEnd}" y2="${segment.yEnd}"></line>
@@ -858,6 +869,10 @@ function buildPhaseDiagram(sequence) {
             )
             .join("")}
         </svg>
+      </div>
+      <div class="phase-diagram-info" aria-live="polite">
+        <strong>Infos de phase</strong>
+        <p>${getSelectedPhaseDiagramText(sequence, Math.min(state.phaseDiagramSelectedIndex, sequence.phases.length - 1))}</p>
       </div>
   `;
 }
@@ -1229,5 +1244,23 @@ elements.additionalDives.addEventListener("change", (event) => {
   dive[field] = field === "enabled" ? target.checked : Number(target.value);
   render();
 });
+
+if (elements.phaseDiagram) {
+  elements.phaseDiagram.addEventListener("click", (event) => {
+    const target = event.target;
+    const segment = target instanceof Element ? target.closest("[data-phase-index]") : null;
+    if (!segment) {
+      return;
+    }
+
+    const phaseIndex = Number(segment.getAttribute("data-phase-index"));
+    if (Number.isNaN(phaseIndex)) {
+      return;
+    }
+
+    state.phaseDiagramSelectedIndex = phaseIndex;
+    render();
+  });
+}
 
 render();

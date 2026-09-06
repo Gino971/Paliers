@@ -635,10 +635,43 @@ output {
   fill: rgba(138, 180, 255, 0.16);
 }
 
+.phase-diagram-segment-group {
+  cursor: pointer;
+}
+
+.phase-diagram-segment-group:focus-visible {
+  outline: none;
+}
+
+.phase-diagram-segment-group--selected .phase-diagram-segment,
+.phase-diagram-segment-group--selected .phase-diagram-plateau,
+.phase-diagram-segment-group--selected .phase-diagram-point circle {
+  filter: drop-shadow(0 0 10px rgba(118, 228, 214, 0.55));
+}
+
 .phase-diagram-point-number {
   fill: var(--text);
   font-size: 11px;
   font-weight: 800;
+}
+
+.phase-diagram-info {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.phase-diagram-info strong {
+  color: var(--accent);
+  font-size: 0.92rem;
+}
+
+.phase-diagram-info p {
+  color: var(--text);
+  line-height: 1.55;
 }
 
 .phase-diagram {
