@@ -194,7 +194,7 @@ h1 {
 
 .controls--top {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 0.8rem;
   --editable-surface: rgba(255, 184, 107, 0.08);
   --editable-surface-strong: rgba(255, 184, 107, 0.14);
