@@ -22,181 +22,237 @@
               <p class="brand-name">Paliers</p>
             </div>
           </div>
-          <h1>Comprendre le calcul des paliers en plongée</h1>
-          <p class="lede">
-            Cette web app illustre, étape par étape, comment une plongée peut conduire à des paliers avec un modèle compartimenté de type Haldane.
-            Chaque tissu est calculé séparément pour rendre visible le compartiment directeur.
-          </p>
-          <div class="notice">
-            <strong>Important :</strong> ce simulateur est éducatif et applique un modèle historique simplifié de Haldane. Il ne remplace pas une table officielle, un ordinateur de plongée ni une formation.
-          </div>
-        </div>
-      </section>
-
-      <section class="card controls controls--top">
-        <div class="subsection subsection--primary">
-          <div class="subsection-head">
-            <h3>Paramètres de la plongée</h3>
-          </div>
-
-          <p class="helper-text">Déplace les curseurs pour voir comment la profondeur et la durée modifient les paliers.</p>
-
-          <label class="field">
-            <span>Profondeur maximale</span>
-            <div class="field-row">
-              <input id="depth" type="range" min="6" max="100" step="1" value="30" />
-              <output id="depthValue">30 m</output>
-            </div>
-          </label>
-
-          <label class="field">
-            <span>Temps fond</span>
-            <div class="field-row">
-              <input id="time" type="range" min="5" max="240" step="1" value="20" />
-              <output id="timeValue">20 min</output>
-            </div>
-          </label>
-
-          <label class="field">
-            <span>Vitesse de descente</span>
-            <div class="field-row">
-              <input id="descentRate" type="range" min="10" max="30" step="1" value="20" />
-              <output id="descentRateValue">20 m/min</output>
-            </div>
-          </label>
-
-          <label class="field">
-            <span>Vitesse de remontée</span>
-            <div class="field-row">
-              <input id="ascentRate" type="range" min="6" max="15" step="1" value="10" />
-              <output id="ascentRateValue">10 m/min</output>
-            </div>
-          </label>
-        </div>
-
-        <div class="subsection subsection--primary">
-          <div class="subsection-head">
-            <h3>Mélange respiratoire</h3>
-          </div>
-
-          <label class="field">
-            <span>Type de mélange</span>
-            <div class="field-row">
-              <select id="mixPreset">
-                <option value="air">Air</option>
-                <option value="heliox1882">Heliox 18/82</option>
-                <option value="heliox2179">Heliox 21/79</option>
-                <option value="nitrox32">Nitrox 32</option>
-                <option value="trimix2135">Trimix 21/35</option>
-                <option value="custom">Personnalisé</option>
-              </select>
-              <output id="mixSummaryValue">O2 21 % • He 0 % • N2 79 %</output>
-            </div>
-          </label>
-
-          <label class="field">
-            <span>Oxygène</span>
-            <div class="field-row">
-              <input id="oxygenPercent" type="range" min="10" max="50" step="1" value="21" />
-              <output id="oxygenPercentValue">21 %</output>
-            </div>
-          </label>
-
-          <label class="field">
-            <span>Hélium</span>
-            <div class="field-row">
-              <input id="heliumPercent" type="range" min="0" max="70" step="1" value="0" />
-              <output id="heliumPercentValue">0 %</output>
-            </div>
-          </label>
-
-          <p class="helper-text">Le calcul reste pédagogique: l'hélium réduit ici la charge inertielle modélisée de façon simplifiée.</p>
-          <div id="oxygenWarning" class="mix-warning" role="status" aria-live="polite"></div>
-        </div>
-
-        <div class="subsection">
-          <div class="subsection-head">
-            <h3>Gaz de palier</h3>
-          </div>
-
-          <div id="stopGasParams" class="second-dive-params">
-            <label class="field">
-              <span>Type de mélange</span>
-              <div class="field-row">
-                <select id="stopMixPreset">
-                  <option value="air">Air</option>
-                  <option value="nitrox50">Nitrox 50</option>
-                  <option value="oxygen100">Oxygène 100 %</option>
-                  <option value="custom">Personnalisé</option>
-                </select>
-                <output id="stopMixSummaryValue">O2 21 % • He 0 % • N2 79 %</output>
-              </div>
-            </label>
-
-            <label class="field">
-              <span>Oxygène</span>
-              <div class="field-row">
-                <input id="stopOxygenPercent" type="range" min="21" max="100" step="1" value="21" />
-                <output id="stopOxygenPercentValue">21 %</output>
-              </div>
-            </label>
-
-            <label class="field">
-              <span>Hélium</span>
-              <div class="field-row">
-                <input id="stopHeliumPercent" type="range" min="0" max="79" step="1" value="0" />
-                <output id="stopHeliumPercentValue">0 %</output>
-              </div>
-            </label>
-
-            <p class="helper-text">Ce gaz n'est utilisé que pendant les paliers et la remontée reste calculée avec le gaz du fond.</p>
-            <div id="stopGasWarning" class="mix-warning" role="status" aria-live="polite"></div>
-          </div>
-        </div>
-
-        <div class="subsection">
-          <div class="subsection-head">
-            <h3>Deuxième plongée</h3>
-            <label class="toggle-row">
-              <input id="secondDiveEnabled" type="checkbox" />
-              <span>Activer</span>
-            </label>
-          </div>
-
-          <div id="secondDiveParams" class="second-dive-params">
-            <label class="field">
-              <span>Intervalle surface</span>
-              <div class="field-row">
-                <input id="surfaceInterval" type="range" min="0" max="720" step="1" value="60" />
-                <output id="surfaceIntervalValue">60 min</output>
-              </div>
-            </label>
-
-            <label class="field">
-              <span>Profondeur seconde plongée</span>
-              <div class="field-row">
-                <input id="secondDepth" type="range" min="6" max="100" step="1" value="20" />
-                <output id="secondDepthValue">20 m</output>
-              </div>
-            </label>
-
-            <label class="field">
-              <span>Temps seconde plongée</span>
-              <div class="field-row">
-                <input id="secondTime" type="range" min="5" max="240" step="1" value="25" />
-                <output id="secondTimeValue">25 min</output>
-              </div>
-            </label>
-
-            <p class="helper-text">Si l'intervalle de surface est inférieur à 15 min, la série est traitée comme une plongée consécutive; au-delà, elle est traitée comme une plongée successive avec azote résiduel.</p>
-
-            <div class="subsection subsection--nested">
+          <section class="card controls controls--top">
+            <div class="subsection subsection--primary">
               <div class="subsection-head">
-                <h3>Plongée additionnelle</h3>
+                <h3>Première plongée</h3>
               </div>
 
-              <div id="additionalDives" class="additional-dives"></div>
+              <p class="helper-text">Déplace les curseurs pour voir comment la profondeur et la durée modifient les paliers.</p>
+
+              <label class="field">
+                <span>Profondeur maximale</span>
+                <div class="field-row">
+                  <input id="depth" type="range" min="6" max="100" step="1" value="30" />
+                  <output id="depthValue">30 m</output>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Temps fond</span>
+                <div class="field-row">
+                  <input id="time" type="range" min="5" max="240" step="1" value="20" />
+                  <output id="timeValue">20 min</output>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Vitesse de descente</span>
+                <div class="field-row">
+                  <input id="descentRate" type="range" min="10" max="30" step="1" value="20" />
+                  <output id="descentRateValue">20 m/min</output>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Vitesse de remontée</span>
+                <div class="field-row">
+                  <input id="ascentRate" type="range" min="6" max="15" step="1" value="10" />
+                  <output id="ascentRateValue">10 m/min</output>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Type de mélange</span>
+                <div class="field-row">
+                  <select id="mixPreset">
+                    <option value="air">Air</option>
+                    <option value="heliox1882">Heliox 18/82</option>
+                    <option value="heliox2179">Heliox 21/79</option>
+                    <option value="nitrox32">Nitrox 32</option>
+                    <option value="trimix2135">Trimix 21/35</option>
+                    <option value="custom">Personnalisé</option>
+                  </select>
+                  <output id="mixSummaryValue">O2 21 % • He 0 % • N2 79 %</output>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Oxygène</span>
+                <div class="field-row">
+                  <input id="oxygenPercent" type="range" min="10" max="50" step="1" value="21" />
+                  <output id="oxygenPercentValue">21 %</output>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Hélium</span>
+                <div class="field-row">
+                  <input id="heliumPercent" type="range" min="0" max="70" step="1" value="0" />
+                  <output id="heliumPercentValue">0 %</output>
+                </div>
+              </label>
+
+              <p class="helper-text">Le calcul reste pédagogique: l'hélium réduit ici la charge inertielle modélisée de façon simplifiée.</p>
+              <div id="oxygenWarning" class="mix-warning" role="status" aria-live="polite"></div>
+
+              <div id="stopGasParams" class="second-dive-params">
+                <div class="subsection-head">
+                  <h3>Gaz de palier pour cette plongée</h3>
+                </div>
+
+                <label class="field">
+                  <span>Type de mélange</span>
+                  <div class="field-row">
+                    <select id="stopMixPreset">
+                      <option value="air">Air</option>
+                      <option value="nitrox50">Nitrox 50</option>
+                      <option value="oxygen100">Oxygène 100 %</option>
+                      <option value="custom">Personnalisé</option>
+                    </select>
+                    <output id="stopMixSummaryValue">O2 21 % • He 0 % • N2 79 %</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Oxygène</span>
+                  <div class="field-row">
+                    <input id="stopOxygenPercent" type="range" min="21" max="100" step="1" value="21" />
+                    <output id="stopOxygenPercentValue">21 %</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Hélium</span>
+                  <div class="field-row">
+                    <input id="stopHeliumPercent" type="range" min="0" max="79" step="1" value="0" />
+                    <output id="stopHeliumPercentValue">0 %</output>
+                  </div>
+                </label>
+
+                <p class="helper-text">Ce gaz n'est utilisé que pendant les paliers et la remontée reste calculée avec le gaz du fond.</p>
+                <div id="stopGasWarning" class="mix-warning" role="status" aria-live="polite"></div>
+              </div>
             </div>
+
+            <div class="subsection">
+              <div class="subsection-head">
+                <h3>Plongée 2</h3>
+                <label class="toggle-row">
+                  <input id="secondDiveEnabled" type="checkbox" />
+                  <span>Activer</span>
+                </label>
+              </div>
+
+              <div id="secondDiveParams" class="second-dive-params">
+                <label class="field">
+                  <span>Intervalle surface</span>
+                  <div class="field-row">
+                    <input id="surfaceInterval" type="range" min="0" max="720" step="1" value="60" />
+                    <output id="surfaceIntervalValue">60 min</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Profondeur seconde plongée</span>
+                  <div class="field-row">
+                    <input id="secondDepth" type="range" min="6" max="100" step="1" value="20" />
+                    <output id="secondDepthValue">20 m</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Temps seconde plongée</span>
+                  <div class="field-row">
+                    <input id="secondTime" type="range" min="5" max="240" step="1" value="25" />
+                    <output id="secondTimeValue">25 min</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Vitesse de descente</span>
+                  <div class="field-row">
+                    <input id="secondDescentRate" type="range" min="10" max="30" step="1" value="20" />
+                    <output id="secondDescentRateValue">20 m/min</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Vitesse de remontée</span>
+                  <div class="field-row">
+                    <input id="secondAscentRate" type="range" min="6" max="15" step="1" value="10" />
+                    <output id="secondAscentRateValue">10 m/min</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Type de mélange</span>
+                  <div class="field-row field-row--preset">
+                    <select id="secondMixPreset">
+                      <option value="air">Air</option>
+                      <option value="heliox1882">Heliox 18/82</option>
+                      <option value="heliox2179">Heliox 21/79</option>
+                      <option value="nitrox32">Nitrox 32</option>
+                      <option value="trimix2135">Trimix 21/35</option>
+                      <option value="custom">Personnalisé</option>
+                    </select>
+                    <output id="secondMixSummaryValue" data-field="mixSummaryValue">O2 21 % • He 0 % • N2 79 %</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Oxygène</span>
+                  <div class="field-row">
+                    <input id="secondOxygenPercent" type="range" min="10" max="50" step="1" value="21" />
+                    <output id="secondOxygenPercentValue" data-field="oxygenPercentValue">21 %</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Hélium</span>
+                  <div class="field-row">
+                    <input id="secondHeliumPercent" type="range" min="0" max="70" step="1" value="0" />
+                    <output id="secondHeliumPercentValue" data-field="heliumPercentValue">0 %</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Gaz de palier</span>
+                  <div class="field-row field-row--preset">
+                    <select id="secondStopMixPreset">
+                      <option value="air">Air</option>
+                      <option value="nitrox50">Nitrox 50</option>
+                      <option value="oxygen100">Oxygène 100 %</option>
+                      <option value="custom">Personnalisé</option>
+                    </select>
+                    <output id="secondStopMixSummaryValue" data-field="stopMixSummaryValue">O2 21 % • He 0 % • N2 79 %</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Oxygène des paliers</span>
+                  <div class="field-row">
+                    <input id="secondStopOxygenPercent" type="range" min="21" max="100" step="1" value="21" />
+                    <output id="secondStopOxygenPercentValue" data-field="stopOxygenPercentValue">21 %</output>
+                  </div>
+                </label>
+
+                <label class="field">
+                  <span>Hélium des paliers</span>
+                  <div class="field-row">
+                    <input id="secondStopHeliumPercent" type="range" min="0" max="79" step="1" value="0" />
+                    <output id="secondStopHeliumPercentValue" data-field="stopHeliumPercentValue">0 %</output>
+                  </div>
+                </label>
+
+                <p class="helper-text">Si l'intervalle de surface est inférieur à 15 min, la série est traitée comme une plongée consécutive; au-delà, elle est traitée comme une plongée successive avec azote résiduel.</p>
+
+                <div class="subsection subsection--nested">
+                  <div id="additionalDives" class="additional-dives"></div>
+                </div>
+              </div>
+            </div>
+          </section>
           </div>
         </div>
       </section>

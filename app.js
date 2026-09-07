@@ -10,12 +10,28 @@ const defaults = {
   stopOxygenPercent: 21,
   stopHeliumPercent: 0,
   secondDiveEnabled: false,
+  secondMixPreset: "air",
+  secondOxygenPercent: 21,
+  secondHeliumPercent: 0,
+  secondStopMixPreset: "air",
+  secondStopOxygenPercent: 21,
+  secondStopHeliumPercent: 0,
   surfaceInterval: 60,
   secondDepth: 20,
   secondTime: 25,
+  secondDescentRate: 20,
+  secondAscentRate: 10,
   thirdSurfaceInterval: 60,
   thirdDepth: 18,
   thirdTime: 20,
+  thirdDescentRate: 20,
+  thirdAscentRate: 10,
+  thirdMixPreset: "air",
+  thirdOxygenPercent: 21,
+  thirdHeliumPercent: 0,
+  thirdStopMixPreset: "air",
+  thirdStopOxygenPercent: 21,
+  thirdStopHeliumPercent: 0,
 };
 
 const state = {
@@ -32,6 +48,14 @@ const state = {
       surfaceInterval: defaults.thirdSurfaceInterval,
       depth: defaults.thirdDepth,
       time: defaults.thirdTime,
+      descentRate: defaults.thirdDescentRate,
+      ascentRate: defaults.thirdAscentRate,
+      mixPreset: defaults.thirdMixPreset,
+      oxygenPercent: defaults.thirdOxygenPercent,
+      heliumPercent: defaults.thirdHeliumPercent,
+      stopMixPreset: defaults.thirdStopMixPreset,
+      stopOxygenPercent: defaults.thirdStopOxygenPercent,
+      stopHeliumPercent: defaults.thirdStopHeliumPercent,
     },
   ],
 };
@@ -76,6 +100,22 @@ const elements = {
   stopMixPreset: document.getElementById("stopMixPreset"),
   stopOxygenPercent: document.getElementById("stopOxygenPercent"),
   stopHeliumPercent: document.getElementById("stopHeliumPercent"),
+  secondMixPreset: document.getElementById("secondMixPreset"),
+  secondOxygenPercent: document.getElementById("secondOxygenPercent"),
+  secondHeliumPercent: document.getElementById("secondHeliumPercent"),
+  secondDescentRate: document.getElementById("secondDescentRate"),
+  secondAscentRate: document.getElementById("secondAscentRate"),
+  secondMixSummaryValue: document.getElementById("secondMixSummaryValue"),
+  secondOxygenPercentValue: document.getElementById("secondOxygenPercentValue"),
+  secondHeliumPercentValue: document.getElementById("secondHeliumPercentValue"),
+  secondDescentRateValue: document.getElementById("secondDescentRateValue"),
+  secondAscentRateValue: document.getElementById("secondAscentRateValue"),
+  secondStopMixPreset: document.getElementById("secondStopMixPreset"),
+  secondStopOxygenPercent: document.getElementById("secondStopOxygenPercent"),
+  secondStopHeliumPercent: document.getElementById("secondStopHeliumPercent"),
+  secondStopMixSummaryValue: document.getElementById("secondStopMixSummaryValue"),
+  secondStopOxygenPercentValue: document.getElementById("secondStopOxygenPercentValue"),
+  secondStopHeliumPercentValue: document.getElementById("secondStopHeliumPercentValue"),
   secondDiveEnabled: document.getElementById("secondDiveEnabled"),
   surfaceInterval: document.getElementById("surfaceInterval"),
   secondDepth: document.getElementById("secondDepth"),
@@ -148,6 +188,44 @@ function formatStopLabel(duration, depth) {
   return `Palier ${formatStopMinutes(duration)} à ${formatDepth(depth)}`;
 }
 
+function buildSelectOptions(values, selectedValue, formatter = (value) => String(value)) {
+  return values
+    .map((value) => `<option value="${value}"${String(value) === String(selectedValue) ? " selected" : ""}>${formatter(value)}</option>`)
+    .join("");
+}
+
+function getDiveMixPresetLabel(presetName) {
+  switch (presetName) {
+    case "air":
+      return "Air";
+    case "heliox1882":
+      return "Heliox 18/82";
+    case "heliox2179":
+      return "Heliox 21/79";
+    case "nitrox32":
+      return "Nitrox 32";
+    case "trimix2135":
+      return "Trimix 21/35";
+    case "custom":
+    default:
+      return "Personnalisé";
+  }
+}
+
+function getStopMixPresetLabel(presetName) {
+  switch (presetName) {
+    case "air":
+      return "Air";
+    case "nitrox50":
+      return "Nitrox 50";
+    case "oxygen100":
+      return "Oxygène 100 %";
+    case "custom":
+    default:
+      return "Personnalisé";
+  }
+}
+
 function getMixPresets() {
   return {
     air: { oxygenPercent: 21, heliumPercent: 0 },
@@ -186,6 +264,221 @@ function getStopMixPresetName(oxygenPercent, heliumPercent) {
   }
 
   return "custom";
+}
+
+function getDiveMixPresets() {
+  return getMixPresets();
+}
+
+function getDiveGasMixFromInputs(oxygenElement, heliumElement) {
+  const oxygenPercent = Number(oxygenElement.value);
+  const heliumPercent = Number(heliumElement.value);
+  return {
+    oxygenPercent,
+    heliumPercent,
+    nitrogenPercent: Math.max(0, 100 - oxygenPercent - heliumPercent),
+    modeledInertFraction: Math.max(0, (100 - oxygenPercent - heliumPercent * HELIUM_EFFECT_FACTOR) / 100),
+  };
+}
+
+function getDivePresetName(oxygenPercent, heliumPercent) {
+  const presets = getDiveMixPresets();
+  for (const [name, preset] of Object.entries(presets)) {
+    if (preset.oxygenPercent === oxygenPercent && preset.heliumPercent === heliumPercent) {
+      return name;
+    }
+  }
+
+  return "custom";
+}
+
+function syncDiveMixBounds(oxygenElement, heliumElement, maxPlannedDepth = 0) {
+  const oxygenPercent = Number(oxygenElement.value);
+  const heliumMax = Math.max(0, 100 - oxygenPercent);
+  heliumElement.max = String(heliumMax);
+  if (Number(heliumElement.value) > heliumMax) {
+    heliumElement.value = String(heliumMax);
+  }
+
+  const heliumPercent = Number(heliumElement.value);
+  const oxygenMax = Math.max(0, Math.min(100 - heliumPercent, getMaxSafeOxygenPercent(maxPlannedDepth)));
+  oxygenElement.max = String(oxygenMax);
+  if (Number(oxygenElement.value) > oxygenMax) {
+    oxygenElement.value = String(oxygenMax);
+  }
+}
+
+function syncDiveMixPreset(presetElement, oxygenElement, heliumElement) {
+  presetElement.value = getDivePresetName(Number(oxygenElement.value), Number(heliumElement.value));
+}
+
+function syncDiveMixOutputs({ presetElement, oxygenElement, heliumElement, oxygenValueElement, heliumValueElement, summaryElement }, maxPlannedDepth = 0) {
+  syncDiveMixBounds(oxygenElement, heliumElement, maxPlannedDepth);
+  syncDiveMixPreset(presetElement, oxygenElement, heliumElement);
+  const gasMix = getDiveGasMixFromInputs(oxygenElement, heliumElement);
+  if (oxygenValueElement) {
+    oxygenValueElement.textContent = formatPercent(gasMix.oxygenPercent);
+  }
+  if (heliumValueElement) {
+    heliumValueElement.textContent = formatPercent(gasMix.heliumPercent);
+  }
+  if (summaryElement) {
+    summaryElement.textContent = formatGasMixSummary(gasMix);
+  }
+
+  return gasMix;
+}
+
+function applyDiveGasPreset(presetElement, oxygenElement, heliumElement, presetName) {
+  if (presetName === "custom") {
+    syncDiveMixOutputs({
+      presetElement,
+      oxygenElement,
+      heliumElement,
+    });
+    return;
+  }
+
+  const preset = getDiveMixPresets()[presetName] || getDiveMixPresets().air;
+  oxygenElement.value = String(preset.oxygenPercent);
+  syncDiveMixBounds(oxygenElement, heliumElement);
+  heliumElement.value = String(preset.heliumPercent);
+  syncDiveMixOutputs({
+    presetElement,
+    oxygenElement,
+    heliumElement,
+  });
+}
+
+function getDiveStopGasMixFromInputs(stopOxygenElement, stopHeliumElement) {
+  const oxygenPercent = Number(stopOxygenElement.value);
+  const heliumPercent = Number(stopHeliumElement.value);
+  return {
+    oxygenPercent,
+    heliumPercent,
+    nitrogenPercent: Math.max(0, 100 - oxygenPercent - heliumPercent),
+    modeledInertFraction: Math.max(0, (100 - oxygenPercent - heliumPercent * HELIUM_EFFECT_FACTOR) / 100),
+  };
+}
+
+function syncDiveStopGasBounds(stopOxygenElement, stopHeliumElement, maxStopDepth = 0) {
+  const oxygenPercent = Number(stopOxygenElement.value);
+  const heliumMax = Math.max(0, 100 - oxygenPercent);
+  stopHeliumElement.max = String(heliumMax);
+  if (Number(stopHeliumElement.value) > heliumMax) {
+    stopHeliumElement.value = String(heliumMax);
+  }
+
+  const heliumPercent = Number(stopHeliumElement.value);
+  const oxygenMax = Math.max(0, Math.min(100 - heliumPercent, getMaxSafeOxygenPercent(maxStopDepth)));
+  stopOxygenElement.max = String(oxygenMax);
+  if (Number(stopOxygenElement.value) > oxygenMax) {
+    stopOxygenElement.value = String(oxygenMax);
+  }
+}
+
+function syncDiveStopGasPreset(presetElement, stopOxygenElement, stopHeliumElement) {
+  presetElement.value = getStopMixPresetName(Number(stopOxygenElement.value), Number(stopHeliumElement.value));
+}
+
+function syncDiveStopGasOutputs({ presetElement, stopOxygenElement, stopHeliumElement, oxygenValueElement, heliumValueElement, summaryElement }, maxStopDepth = 0) {
+  syncDiveStopGasBounds(stopOxygenElement, stopHeliumElement, maxStopDepth);
+  syncDiveStopGasPreset(presetElement, stopOxygenElement, stopHeliumElement);
+  const gasMix = getDiveStopGasMixFromInputs(stopOxygenElement, stopHeliumElement);
+  if (oxygenValueElement) {
+    oxygenValueElement.textContent = formatPercent(gasMix.oxygenPercent);
+  }
+  if (heliumValueElement) {
+    heliumValueElement.textContent = formatPercent(gasMix.heliumPercent);
+  }
+  if (summaryElement) {
+    summaryElement.textContent = formatGasMixSummary(gasMix);
+  }
+
+  return gasMix;
+}
+
+function applyDiveStopGasPreset(presetElement, stopOxygenElement, stopHeliumElement, presetName) {
+  if (presetName === "custom") {
+    syncDiveStopGasOutputs({
+      presetElement,
+      stopOxygenElement,
+      stopHeliumElement,
+    });
+    return;
+  }
+
+  const preset = getStopMixPresets()[presetName] || getStopMixPresets().air;
+  stopOxygenElement.value = String(preset.oxygenPercent);
+  syncDiveStopGasBounds(stopOxygenElement, stopHeliumElement);
+  stopHeliumElement.value = String(preset.heliumPercent);
+  syncDiveStopGasOutputs({
+    presetElement,
+    stopOxygenElement,
+    stopHeliumElement,
+  });
+}
+
+function syncDiveCardMixControls(container, maxPlannedDepth = 0) {
+  if (!(container instanceof Element)) {
+    return null;
+  }
+
+  const presetElement = container.querySelector('select[data-field="mixPreset"]');
+  const oxygenElement = container.querySelector('input[data-field="oxygenPercent"]');
+  const heliumElement = container.querySelector('input[data-field="heliumPercent"]');
+  if (!(presetElement instanceof HTMLSelectElement) || !(oxygenElement instanceof HTMLInputElement) || !(heliumElement instanceof HTMLInputElement)) {
+    return null;
+  }
+
+  const gasMix = syncDiveMixOutputs({
+    presetElement,
+    oxygenElement,
+    heliumElement,
+    oxygenValueElement: container.querySelector('[data-field="oxygenPercentValue"]'),
+    heliumValueElement: container.querySelector('[data-field="heliumPercentValue"]'),
+    summaryElement: container.querySelector('[data-field="mixSummaryValue"]'),
+  }, maxPlannedDepth);
+
+  const diveIndex = Number(container.dataset.diveIndex);
+  if (Number.isInteger(diveIndex) && state.additionalDives[diveIndex]) {
+    state.additionalDives[diveIndex].mixPreset = presetElement.value;
+    state.additionalDives[diveIndex].oxygenPercent = gasMix.oxygenPercent;
+    state.additionalDives[diveIndex].heliumPercent = gasMix.heliumPercent;
+  }
+
+  return gasMix;
+}
+
+function syncDiveCardStopGasControls(container, maxStopDepth = 0) {
+  if (!(container instanceof Element)) {
+    return null;
+  }
+
+  const presetElement = container.querySelector('select[data-field="stopMixPreset"]');
+  const stopOxygenElement = container.querySelector('input[data-field="stopOxygenPercent"]');
+  const stopHeliumElement = container.querySelector('input[data-field="stopHeliumPercent"]');
+  if (!(presetElement instanceof HTMLSelectElement) || !(stopOxygenElement instanceof HTMLInputElement) || !(stopHeliumElement instanceof HTMLInputElement)) {
+    return null;
+  }
+
+  const gasMix = syncDiveStopGasOutputs({
+    presetElement,
+    stopOxygenElement,
+    stopHeliumElement,
+    oxygenValueElement: container.querySelector('[data-field="stopOxygenPercentValue"]'),
+    heliumValueElement: container.querySelector('[data-field="stopHeliumPercentValue"]'),
+    summaryElement: container.querySelector('[data-field="stopMixSummaryValue"]'),
+  }, maxStopDepth);
+
+  const diveIndex = Number(container.dataset.diveIndex);
+  if (Number.isInteger(diveIndex) && state.additionalDives[diveIndex]) {
+    state.additionalDives[diveIndex].stopMixPreset = presetElement.value;
+    state.additionalDives[diveIndex].stopOxygenPercent = gasMix.oxygenPercent;
+    state.additionalDives[diveIndex].stopHeliumPercent = gasMix.heliumPercent;
+  }
+
+  return gasMix;
 }
 
 function getGasMixFromInputs() {
@@ -421,6 +714,11 @@ function applyStopGasPreset(presetName) {
 }
 
 function applyGasMixPreset(presetName) {
+  if (presetName === "custom") {
+    syncGasMixOutputs();
+    return;
+  }
+
   const preset = getMixPresets()[presetName] || getMixPresets().air;
   elements.oxygenPercent.value = String(preset.oxygenPercent);
   syncGasMixBounds();
@@ -434,7 +732,44 @@ function cloneDive(dive) {
     surfaceInterval: dive.surfaceInterval,
     depth: dive.depth,
     time: dive.time,
+    descentRate: dive.descentRate,
+    ascentRate: dive.ascentRate,
+    mixPreset: dive.mixPreset,
+    oxygenPercent: dive.oxygenPercent,
+    heliumPercent: dive.heliumPercent,
   };
+}
+
+function createAdditionalDiveDefaults() {
+  return {
+    enabled: false,
+    surfaceInterval: defaults.thirdSurfaceInterval,
+    depth: defaults.thirdDepth,
+    time: defaults.thirdTime,
+    descentRate: defaults.thirdDescentRate,
+    ascentRate: defaults.thirdAscentRate,
+    mixPreset: defaults.thirdMixPreset,
+    oxygenPercent: defaults.thirdOxygenPercent,
+    heliumPercent: defaults.thirdHeliumPercent,
+    stopMixPreset: defaults.thirdStopMixPreset,
+    stopOxygenPercent: defaults.thirdStopOxygenPercent,
+    stopHeliumPercent: defaults.thirdStopHeliumPercent,
+  };
+}
+
+function normalizeAdditionalDives() {
+  if (state.additionalDives.length === 0) {
+    state.additionalDives.push(createAdditionalDiveDefaults());
+    return;
+  }
+
+  const firstDisabledIndex = state.additionalDives.findIndex((dive) => !dive.enabled);
+  if (firstDisabledIndex === -1) {
+    state.additionalDives.push(createAdditionalDiveDefaults());
+    return;
+  }
+
+  state.additionalDives = state.additionalDives.slice(0, firstDisabledIndex + 1);
 }
 
 function formatSurfaceIntervals(intervals) {
@@ -447,13 +782,28 @@ function formatSurfaceIntervals(intervals) {
 
 function renderAdditionalDiveBlock(dive, index) {
   const diveNumber = index + 3;
+  const descentRate = Number.isFinite(dive.descentRate) ? dive.descentRate : defaults.descentRate;
+  const ascentRate = Number.isFinite(dive.ascentRate) ? dive.ascentRate : defaults.ascentRate;
+  const mixPreset = dive.mixPreset || "air";
+  const oxygenPercent = Number.isFinite(dive.oxygenPercent) ? dive.oxygenPercent : 21;
+  const heliumPercent = Number.isFinite(dive.heliumPercent) ? dive.heliumPercent : 0;
+  const stopMixPreset = dive.stopMixPreset || "air";
+  const stopOxygenPercent = Number.isFinite(dive.stopOxygenPercent) ? dive.stopOxygenPercent : 21;
+  const stopHeliumPercent = Number.isFinite(dive.stopHeliumPercent) ? dive.stopHeliumPercent : 0;
+  const mixGas = {
+    oxygenPercent,
+    heliumPercent,
+    nitrogenPercent: Math.max(0, 100 - oxygenPercent - heliumPercent),
+  };
+  const stopMixGas = {
+    oxygenPercent: stopOxygenPercent,
+    heliumPercent: stopHeliumPercent,
+    nitrogenPercent: Math.max(0, 100 - stopOxygenPercent - stopHeliumPercent),
+  };
   return `
     <article class="dive-card" data-dive-index="${index}">
       <div class="dive-card-head">
-        <div>
-          <h4>Plongée ${diveNumber}</h4>
-          <p>L'intervalle de surface relie cette plongée à la précédente.</p>
-        </div>
+        <h4>Plongée ${diveNumber}</h4>
         <label class="toggle-row">
           <input data-field="enabled" data-dive-index="${index}" type="checkbox" ${dive.enabled ? "checked" : ""} />
           <span>Activer</span>
@@ -484,12 +834,82 @@ function renderAdditionalDiveBlock(dive, index) {
           <output>${dive.time} min</output>
         </div>
       </label>
+
+      <label class="field">
+        <span>Vitesse de descente</span>
+        <div class="field-row">
+          <input data-field="descentRate" data-dive-index="${index}" type="range" min="10" max="30" step="1" value="${descentRate}" />
+          <output>${descentRate} m/min</output>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Vitesse de remontée</span>
+        <div class="field-row">
+          <input data-field="ascentRate" data-dive-index="${index}" type="range" min="6" max="15" step="1" value="${ascentRate}" />
+          <output>${ascentRate} m/min</output>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Type de mélange</span>
+        <div class="field-row field-row--preset">
+          <select data-field="mixPreset" data-dive-index="${index}">
+            ${buildSelectOptions([...Object.keys(getDiveMixPresets()), "custom"], mixPreset, getDiveMixPresetLabel)}
+          </select>
+          <output data-field="mixSummaryValue">${formatGasMixSummary(mixGas)}</output>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Oxygène</span>
+        <div class="field-row">
+          <input data-field="oxygenPercent" data-dive-index="${index}" type="range" min="10" max="50" step="1" value="${oxygenPercent}" />
+          <output data-field="oxygenPercentValue">${formatPercent(oxygenPercent)}</output>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Hélium</span>
+        <div class="field-row">
+          <input data-field="heliumPercent" data-dive-index="${index}" type="range" min="0" max="70" step="1" value="${heliumPercent}" />
+          <output data-field="heliumPercentValue">${formatPercent(heliumPercent)}</output>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Gaz de palier</span>
+        <div class="field-row field-row--preset">
+          <select data-field="stopMixPreset" data-dive-index="${index}">
+            ${buildSelectOptions(Object.keys(getStopMixPresets()), stopMixPreset, getStopMixPresetLabel)}
+          </select>
+          <output data-field="stopMixSummaryValue">${formatGasMixSummary(stopMixGas)}</output>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Oxygène des paliers</span>
+        <div class="field-row">
+          <input data-field="stopOxygenPercent" data-dive-index="${index}" type="range" min="21" max="100" step="1" value="${stopOxygenPercent}" />
+          <output data-field="stopOxygenPercentValue">${formatPercent(stopOxygenPercent)}</output>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Hélium des paliers</span>
+        <div class="field-row">
+          <input data-field="stopHeliumPercent" data-dive-index="${index}" type="range" min="0" max="79" step="1" value="${stopHeliumPercent}" />
+          <output data-field="stopHeliumPercentValue">${formatPercent(stopHeliumPercent)}</output>
+        </div>
+      </label>
       </div>
     </article>
   `;
 }
 
 function buildAdditionalDiveBlocks() {
+  normalizeAdditionalDives();
+
   if (state.additionalDives.length === 0) {
     return '<p class="helper-text">Aucune plongée supplémentaire pour le moment. Utilise le bouton ci-dessus pour en ajouter une.</p>';
   }
@@ -611,7 +1031,7 @@ function findHoldMinutes(tensions, currentDepth, nextDepth, travelMinutes, holdG
   return Math.max(1, Math.ceil(high));
 }
 
-function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabled, surfaceInterval, secondDepth, secondTime, additionalDives = [], gasMix = state.gasMix || getGasMixFromInputs(), stopGasMix = state.stopGasMix || gasMix) {
+function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabled, surfaceInterval, secondDepth, secondTime, secondDescentRate, secondAscentRate, secondDiveGasMix, secondDiveStopGasMix, additionalDives = [], gasMix = state.gasMix || getGasMixFromInputs(), stopGasMix = state.stopGasMix || gasMix) {
   const firstDive = buildDiveModel(depth, time, descentRate, ascentRate, {
     labelPrefix: "Plongée 1",
     gasMix,
@@ -632,19 +1052,19 @@ function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabl
     };
   }
 
-  function addSurfaceIntervalAndDive(previousDive, intervalMinutes, diveDepth, diveTime, diveLabel, diveNumber) {
+  function addSurfaceIntervalAndDive(previousDive, intervalMinutes, diveDepth, diveTime, diveDescentRate, diveAscentRate, diveLabel, diveNumber, diveGasMix, diveStopGasMix) {
     const safeIntervalMinutes = Math.max(0, intervalMinutes);
     const intervalTensions = simulateConstantPhase(previousDive.finalTensions, 0, safeIntervalMinutes);
     const intervalSnapshot = buildSnapshot(intervalTensions, 0);
     const relationship = safeIntervalMinutes < 15 ? "consécutive" : "successive";
-    const nextDive = buildDiveModel(diveDepth, diveTime, descentRate, ascentRate, {
+    const nextDive = buildDiveModel(diveDepth, diveTime, diveDescentRate, diveAscentRate, {
       initialTensions: intervalTensions,
       labelPrefix: diveLabel,
       startLabel: `Départ de la plongée ${diveNumber}`,
       startKind: "surfaceStart",
       startDepth: 0,
-      gasMix,
-      stopGasMix,
+      gasMix: diveGasMix || gasMix,
+      stopGasMix: diveStopGasMix || stopGasMix,
     });
 
     return {
@@ -678,8 +1098,26 @@ function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabl
       surfaceInterval,
       depth: secondDepth,
       time: secondTime,
+      descentRate: secondDescentRate,
+      ascentRate: secondAscentRate,
+      gasMix: secondDiveGasMix || gasMix,
+      stopGasMix: secondDiveStopGasMix || stopGasMix,
     },
-    ...additionalDives.filter((dive) => dive.enabled).map(cloneDive),
+    ...additionalDives.filter((dive) => dive.enabled).map((dive) => ({
+      ...cloneDive(dive),
+      gasMix: {
+        oxygenPercent: dive.oxygenPercent,
+        heliumPercent: dive.heliumPercent,
+        nitrogenPercent: Math.max(0, 100 - dive.oxygenPercent - dive.heliumPercent),
+        modeledInertFraction: Math.max(0, (100 - dive.oxygenPercent - dive.heliumPercent * HELIUM_EFFECT_FACTOR) / 100),
+      },
+      stopGasMix: {
+        oxygenPercent: dive.stopOxygenPercent,
+        heliumPercent: dive.stopHeliumPercent,
+        nitrogenPercent: Math.max(0, 100 - dive.stopOxygenPercent - dive.stopHeliumPercent),
+        modeledInertFraction: Math.max(0, (100 - dive.stopOxygenPercent - dive.stopHeliumPercent * HELIUM_EFFECT_FACTOR) / 100),
+      },
+    })),
   ];
 
   let combinedPhases = [...firstDive.phases];
@@ -691,8 +1129,8 @@ function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabl
   const surfaceIntervals = [];
 
   divePlan.forEach((dive, index) => {
-    const diveNumber = index + 2;
-    const transition = addSurfaceIntervalAndDive(finalModel, dive.surfaceInterval, dive.depth, dive.time, `Plongée ${diveNumber}`, diveNumber);
+    const diveNumber = index + 3;
+    const transition = addSurfaceIntervalAndDive(finalModel, dive.surfaceInterval, dive.depth, dive.time, dive.descentRate || descentRate, dive.ascentRate || ascentRate, `Plongée ${diveNumber}`, diveNumber, dive.gasMix, dive.stopGasMix);
 
     transitions.push(transition);
     surfaceIntervals.push(transition.intervalMinutes);
@@ -803,15 +1241,6 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
     const snapshot = buildSnapshot(tissues, currentDepth);
     const control = getControllingTissue(snapshot);
 
-    if (control.ceilingDepth <= EPSILON) {
-      const ascentMinutes = currentDepth / ascentRate;
-      tissues = simulateTravelPhase(tissues, currentDepth, 0, ascentMinutes, travelGasMix);
-      phases.push({ label: `${labelPrefix}Montée ${currentDepth} m → surface`, kind: "ascent", duration: ascentMinutes, from: currentDepth, to: 0 });
-      recordPhase(`Arrivée surface depuis ${currentDepth} m`, "ascent", 0, tissues, ascentMinutes);
-      currentDepth = 0;
-      break;
-    }
-
     const stopDepth = chooseNextStopDepth(control.ceilingDepth, currentDepth);
 
     if (stopDepth >= currentDepth - EPSILON) {
@@ -823,8 +1252,8 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
       const heldControl = getControllingTissue(heldSnapshot);
 
       stops.push({
-        depth: currentDepth,
         minutes: holdMinutes,
+        depth: currentDepth,
         controllingTissue: heldControl.label,
         ceilingDepth: heldControl.ceilingDepth,
         recommendedStopDepth: heldControl.recommendedStopDepth,
@@ -866,6 +1295,7 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
     });
     recordPhase(`Arrivée à ${stopDepth} m`, "ascent", stopDepth, tissues, ascentMinutes);
     currentDepth = stopDepth;
+
   }
 
   const surfaceSnapshot = phaseSnapshots[phaseSnapshots.length - 1]?.depth === 0 ? phaseSnapshots[phaseSnapshots.length - 1].snapshot : recordPhase("Surface finale", "surface", 0, tissues, 0);
@@ -1452,8 +1882,10 @@ function syncSecondDiveParamsVisibility(secondDiveEnabled) {
   elements.secondDiveParams.hidden = !secondDiveEnabled;
   elements.secondDiveParams.setAttribute("aria-hidden", String(!secondDiveEnabled));
 
-  elements.secondDiveParams.querySelectorAll("input, output").forEach((element) => {
+  elements.secondDiveParams.querySelectorAll("input, select, output").forEach((element) => {
     if (element.tagName === "INPUT") {
+      element.disabled = !secondDiveEnabled;
+    } else if (element.tagName === "SELECT") {
       element.disabled = !secondDiveEnabled;
     }
   });
@@ -1473,7 +1905,7 @@ function syncAdditionalDivesVisibility(secondDiveEnabled) {
   elements.additionalDives.hidden = !visible;
   elements.additionalDives.setAttribute("aria-hidden", String(!visible));
 
-  elements.additionalDives.querySelectorAll("input").forEach((element) => {
+  elements.additionalDives.querySelectorAll("input, select").forEach((element) => {
     element.disabled = !visible;
   });
 }
@@ -1514,6 +1946,8 @@ function syncVisibleSliderValues() {
   syncSliderOutput(elements.surfaceInterval);
   syncSliderOutput(elements.secondDepth);
   syncSliderOutput(elements.secondTime);
+  syncSliderOutput(elements.secondDescentRate);
+  syncSliderOutput(elements.secondAscentRate);
 
   elements.additionalDives.querySelectorAll("input[type='range']").forEach((input) => {
     if (input instanceof HTMLInputElement) {
@@ -1534,6 +1968,8 @@ function updateAdditionalDiveFieldVisibility() {
 }
 
 function render() {
+  normalizeAdditionalDives();
+
   const depth = Number(elements.depth.value);
   const time = Number(elements.time.value);
   const descentRate = Number(elements.descentRate.value);
@@ -1543,12 +1979,29 @@ function render() {
   const surfaceInterval = Number(elements.surfaceInterval.value);
   const secondDepth = Number(elements.secondDepth.value);
   const secondTime = Number(elements.secondTime.value);
+  const secondDescentRate = Number(elements.secondDescentRate.value);
+  const secondAscentRate = Number(elements.secondAscentRate.value);
   const maxPlannedDepth = getMaxPlannedDepth(depth, secondDiveEnabled, secondDepth, state.additionalDives);
   const rawGasMix = {
     oxygenPercent: Number(elements.oxygenPercent.value),
     heliumPercent: Number(elements.heliumPercent.value),
   };
   const gasMix = syncGasMixOutputs(maxPlannedDepth);
+  const secondDiveGasMix = syncDiveCardMixControls(elements.secondDiveParams, secondDepth) || gasMix;
+  const secondDiveStopGasMix = syncDiveStopGasOutputs({
+    presetElement: elements.secondStopMixPreset,
+    stopOxygenElement: elements.secondStopOxygenPercent,
+    stopHeliumElement: elements.secondStopHeliumPercent,
+    oxygenValueElement: elements.secondStopOxygenPercentValue,
+    heliumValueElement: elements.secondStopHeliumPercentValue,
+    summaryElement: elements.secondStopMixSummaryValue,
+  });
+  elements.additionalDives.querySelectorAll('.dive-card').forEach((card) => {
+    const diveDepthInput = card.querySelector('input[data-field="depth"]');
+    const diveDepth = diveDepthInput instanceof HTMLInputElement ? Number(diveDepthInput.value) : 0;
+    syncDiveCardMixControls(card, diveDepth);
+    syncDiveCardStopGasControls(card, diveDepth);
+  });
   let stopGasMix = syncStopGasMixOutputs();
   let sequence = buildDiveSequence(
     depth,
@@ -1559,6 +2012,10 @@ function render() {
     surfaceInterval,
     secondDepth,
     secondTime,
+    secondDescentRate,
+    secondAscentRate,
+    secondDiveGasMix,
+    secondDiveStopGasMix,
     state.additionalDives,
     gasMix,
     stopGasMix
@@ -1580,6 +2037,10 @@ function render() {
         surfaceInterval,
         secondDepth,
         secondTime,
+        secondDescentRate,
+        secondAscentRate,
+        secondDiveGasMix,
+        secondDiveStopGasMix,
         state.additionalDives,
         gasMix,
         stopGasMix
@@ -1594,6 +2055,12 @@ function render() {
   syncSecondDiveParamsVisibility(secondDiveEnabled);
   elements.additionalDives.innerHTML = buildAdditionalDiveBlocks();
   syncAdditionalDivesVisibility(secondDiveEnabled);
+  elements.additionalDives.querySelectorAll(".dive-card").forEach((card) => {
+    const diveDepthInput = card.querySelector('input[data-field="depth"]');
+    const diveDepth = diveDepthInput instanceof HTMLInputElement ? Number(diveDepthInput.value) : 0;
+    syncDiveCardMixControls(card, diveDepth);
+    syncDiveCardStopGasControls(card, diveDepth);
+  });
   updateAdditionalDiveFieldVisibility();
 
   syncVisibleSliderValues();
@@ -1677,6 +2144,52 @@ elements.stopHeliumPercent.addEventListener("input", () => {
 elements.stopOxygenPercent.addEventListener("change", render);
 elements.stopHeliumPercent.addEventListener("change", render);
 
+elements.secondMixPreset.addEventListener("change", (event) => {
+  applyDiveGasPreset(elements.secondMixPreset, elements.secondOxygenPercent, elements.secondHeliumPercent, event.target.value);
+  render();
+});
+
+elements.secondOxygenPercent.addEventListener("input", () => {
+  syncDiveCardMixControls(elements.secondDiveParams, Number(elements.secondDepth.value));
+});
+
+elements.secondHeliumPercent.addEventListener("input", () => {
+  syncDiveCardMixControls(elements.secondDiveParams, Number(elements.secondDepth.value));
+});
+
+elements.secondOxygenPercent.addEventListener("change", render);
+elements.secondHeliumPercent.addEventListener("change", render);
+
+elements.secondStopMixPreset.addEventListener("change", (event) => {
+  applyDiveStopGasPreset(elements.secondStopMixPreset, elements.secondStopOxygenPercent, elements.secondStopHeliumPercent, event.target.value);
+  render();
+});
+
+elements.secondStopOxygenPercent.addEventListener("input", () => {
+  syncDiveStopGasOutputs({
+    presetElement: elements.secondStopMixPreset,
+    stopOxygenElement: elements.secondStopOxygenPercent,
+    stopHeliumElement: elements.secondStopHeliumPercent,
+    oxygenValueElement: elements.secondStopOxygenPercentValue,
+    heliumValueElement: elements.secondStopHeliumPercentValue,
+    summaryElement: elements.secondStopMixSummaryValue,
+  });
+});
+
+elements.secondStopHeliumPercent.addEventListener("input", () => {
+  syncDiveStopGasOutputs({
+    presetElement: elements.secondStopMixPreset,
+    stopOxygenElement: elements.secondStopOxygenPercent,
+    stopHeliumElement: elements.secondStopHeliumPercent,
+    oxygenValueElement: elements.secondStopOxygenPercentValue,
+    heliumValueElement: elements.secondStopHeliumPercentValue,
+    summaryElement: elements.secondStopMixSummaryValue,
+  });
+});
+
+elements.secondStopOxygenPercent.addEventListener("change", render);
+elements.secondStopHeliumPercent.addEventListener("change", render);
+
 elements.oxygenPercent.addEventListener("input", () => {
   syncGasMixOutputs();
 });
@@ -1694,12 +2207,32 @@ elements.descentRate.addEventListener("input", syncVisibleSliderValues);
 elements.ascentRate.addEventListener("input", syncVisibleSliderValues);
 elements.surfaceInterval.addEventListener("input", syncVisibleSliderValues);
 elements.secondDepth.addEventListener("input", syncVisibleSliderValues);
+elements.secondDepth.addEventListener("input", () => {
+  syncDiveCardMixControls(elements.secondDiveParams, Number(elements.secondDepth.value));
+});
 elements.secondTime.addEventListener("input", syncVisibleSliderValues);
+elements.secondDescentRate.addEventListener("input", syncVisibleSliderValues);
+elements.secondAscentRate.addEventListener("input", syncVisibleSliderValues);
 
 elements.additionalDives.addEventListener("input", (event) => {
   const target = event.target;
   if (target instanceof HTMLInputElement && target.type === "range") {
     syncSliderOutput(target);
+    const card = target.closest(".dive-card");
+    if (card instanceof Element) {
+      const diveDepthInput = card.querySelector('input[data-field="depth"]');
+      const diveDepth = diveDepthInput instanceof HTMLInputElement ? Number(diveDepthInput.value) : 0;
+      syncDiveCardMixControls(card, diveDepth);
+      syncDiveCardStopGasControls(card, diveDepth);
+    }
+  } else if (target instanceof HTMLSelectElement) {
+    const card = target.closest(".dive-card");
+    if (card instanceof Element) {
+      const diveDepthInput = card.querySelector('input[data-field="depth"]');
+      const diveDepth = diveDepthInput instanceof HTMLInputElement ? Number(diveDepthInput.value) : 0;
+      syncDiveCardMixControls(card, diveDepth);
+      syncDiveCardStopGasControls(card, diveDepth);
+    }
   }
 });
 
@@ -1711,10 +2244,12 @@ elements.secondDiveEnabled.addEventListener("change", render);
 elements.surfaceInterval.addEventListener("change", render);
 elements.secondDepth.addEventListener("change", render);
 elements.secondTime.addEventListener("change", render);
+elements.secondDescentRate.addEventListener("change", render);
+elements.secondAscentRate.addEventListener("change", render);
 
 elements.additionalDives.addEventListener("change", (event) => {
   const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
+  if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) {
     return;
   }
 
@@ -1726,7 +2261,21 @@ elements.additionalDives.addEventListener("change", (event) => {
     return;
   }
 
-  dive[field] = field === "enabled" ? target.checked : Number(target.value);
+  if (field === "enabled") {
+    dive.enabled = target.checked;
+  } else if (field === "mixPreset") {
+    applyDiveGasPreset(target, target.closest(".dive-card")?.querySelector('input[data-field="oxygenPercent"]'), target.closest(".dive-card")?.querySelector('input[data-field="heliumPercent"]'), target.value);
+    dive.mixPreset = target.value;
+    dive.oxygenPercent = Number(target.closest(".dive-card")?.querySelector('input[data-field="oxygenPercent"]')?.value || dive.oxygenPercent);
+    dive.heliumPercent = Number(target.closest(".dive-card")?.querySelector('input[data-field="heliumPercent"]')?.value || dive.heliumPercent);
+  } else if (field === "stopMixPreset") {
+    applyDiveStopGasPreset(target, target.closest(".dive-card")?.querySelector('input[data-field="stopOxygenPercent"]'), target.closest(".dive-card")?.querySelector('input[data-field="stopHeliumPercent"]'), target.value);
+    dive.stopMixPreset = target.value;
+    dive.stopOxygenPercent = Number(target.closest(".dive-card")?.querySelector('input[data-field="stopOxygenPercent"]')?.value || dive.stopOxygenPercent);
+    dive.stopHeliumPercent = Number(target.closest(".dive-card")?.querySelector('input[data-field="stopHeliumPercent"]')?.value || dive.stopHeliumPercent);
+  } else {
+    dive[field] = Number(target.value);
+  }
   render();
 });
 
