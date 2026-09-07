@@ -1063,6 +1063,21 @@ function getSelectedPhaseDiagramText(sequence, selectedIndex, stopGasMix, stopGa
   return `${baseText} • Gaz de palier: ${formatGasMixSummary(stopGasMix)}`;
 }
 
+function getPhaseDurationSummary(sequence) {
+  const phases = sequence.phases || [];
+  const sumDuration = (kind) => phases.filter((phase) => phase.kind === kind).reduce((sum, phase) => sum + phase.duration, 0);
+  const totalDiveDuration = phases
+    .filter((phase) => phase.kind !== "surfaceInterval" && phase.kind !== "surface")
+    .reduce((sum, phase) => sum + phase.duration, 0);
+
+  return {
+    descentDuration: sumDuration("descent"),
+    ascentDuration: sumDuration("ascent"),
+    stopDuration: sumDuration("stop"),
+    totalDiveDuration,
+  };
+}
+
 function buildPhaseDiagram(sequence, stopGasMix, stopGasEnabled) {
   const phases = sequence.phases;
   const chartPhases = phases;
@@ -1074,6 +1089,7 @@ function buildPhaseDiagram(sequence, stopGasMix, stopGasEnabled) {
   const minimumPlotWidth = 1400;
   const durationScale = 40;
   const durationOffset = 26;
+  const durationSummary = getPhaseDurationSummary(sequence);
   const phaseWeights = chartPhases.map((phase) => durationOffset + Math.sqrt(Math.max(phase.duration, 1)) * durationScale);
   const totalCompressedWidth = phaseWeights.reduce((sum, value) => sum + value, 0);
   const width = Math.max(minimumPlotWidth, Math.ceil(totalCompressedWidth) + paddingX * 2);
@@ -1227,6 +1243,24 @@ function buildPhaseDiagram(sequence, stopGasMix, stopGasEnabled) {
       <div class="phase-diagram-info" aria-live="polite">
         <strong>Infos de phase</strong>
         <p>${getSelectedPhaseDiagramText(sequence, Math.min(state.phaseDiagramSelectedIndex, sequence.phases.length - 1), stopGasMix, stopGasEnabled)}</p>
+        <div class="phase-diagram-duration-summary" aria-label="Résumé des durées">
+          <div class="phase-diagram-duration-card phase-diagram-duration-card--descent">
+            <span>Descente</span>
+            <strong>${formatMinutes(durationSummary.descentDuration)}</strong>
+          </div>
+          <div class="phase-diagram-duration-card phase-diagram-duration-card--ascent">
+            <span>Montées</span>
+            <strong>${formatMinutes(durationSummary.ascentDuration)}</strong>
+          </div>
+          <div class="phase-diagram-duration-card phase-diagram-duration-card--stops">
+            <span>Total des paliers</span>
+            <strong>${formatMinutes(durationSummary.stopDuration)}</strong>
+          </div>
+          <div class="phase-diagram-duration-card phase-diagram-duration-card--total">
+            <span>Durée totale</span>
+            <strong>${formatMinutes(durationSummary.totalDiveDuration)}</strong>
+          </div>
+        </div>
       </div>
   `;
 }
