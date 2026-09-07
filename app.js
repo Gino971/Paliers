@@ -1204,8 +1204,8 @@ function buildPhaseDiagram(sequence, stopGasMix, stopGasEnabled) {
                   <line class="phase-diagram-segment phase-diagram-segment--${segment.phase.kind}${segment.isFlat ? ' phase-diagram-segment--flat' : ''}" x1="${segment.xStart}" y1="${segment.yStart}" x2="${segment.xEnd}" y2="${segment.yEnd}"></line>
                   ${stopGasEnabled && segment.phase.kind === "stop" ? `
                     <g class="phase-diagram-stopgas">
-                      <rect x="${segment.x - 46}" y="${Math.max(paddingY + 10, segment.y - 34)}" width="92" height="22" rx="11"></rect>
-                      <text x="${segment.x}" y="${Math.max(paddingY + 25, segment.y - 19)}" text-anchor="middle">${formatPercent(stopGasMix.oxygenPercent)} O2</text>
+                      <rect x="${segment.x - 58}" y="${Math.max(paddingY + 8, segment.y - 34)}" width="116" height="24" rx="12"></rect>
+                      <text x="${segment.x}" y="${Math.max(paddingY + 25, segment.y - 17)}" text-anchor="middle">Gaz palier ${formatPercent(stopGasMix.oxygenPercent)}</text>
                     </g>
                   ` : ""}
                   ${segment.relationshipLabel ? `

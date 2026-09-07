@@ -34,44 +34,47 @@
       </section>
 
       <section class="card controls controls--top">
-        <div class="section-head">
-          <h2>Paramètres de la plongée</h2>
-          <p>Déplace les curseurs pour voir comment la profondeur et la durée modifient les paliers.</p>
+        <div class="subsection subsection--primary">
+          <div class="subsection-head">
+            <h3>Paramètres de la plongée</h3>
+          </div>
+
+          <p class="helper-text">Déplace les curseurs pour voir comment la profondeur et la durée modifient les paliers.</p>
+
+          <label class="field">
+            <span>Profondeur maximale</span>
+            <div class="field-row">
+              <input id="depth" type="range" min="6" max="100" step="1" value="30" />
+              <output id="depthValue">30 m</output>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Temps fond</span>
+            <div class="field-row">
+              <input id="time" type="range" min="5" max="240" step="1" value="20" />
+              <output id="timeValue">20 min</output>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Vitesse de descente</span>
+            <div class="field-row">
+              <input id="descentRate" type="range" min="10" max="30" step="1" value="20" />
+              <output id="descentRateValue">20 m/min</output>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Vitesse de remontée</span>
+            <div class="field-row">
+              <input id="ascentRate" type="range" min="6" max="15" step="1" value="10" />
+              <output id="ascentRateValue">10 m/min</output>
+            </div>
+          </label>
         </div>
 
-        <label class="field">
-          <span>Profondeur maximale</span>
-          <div class="field-row">
-            <input id="depth" type="range" min="6" max="100" step="1" value="30" />
-            <output id="depthValue">30 m</output>
-          </div>
-        </label>
-
-        <label class="field">
-          <span>Temps fond</span>
-          <div class="field-row">
-            <input id="time" type="range" min="5" max="240" step="1" value="20" />
-            <output id="timeValue">20 min</output>
-          </div>
-        </label>
-
-        <label class="field">
-          <span>Vitesse de descente</span>
-          <div class="field-row">
-            <input id="descentRate" type="range" min="10" max="30" step="1" value="20" />
-            <output id="descentRateValue">20 m/min</output>
-          </div>
-        </label>
-
-        <label class="field">
-          <span>Vitesse de remontée</span>
-          <div class="field-row">
-            <input id="ascentRate" type="range" min="6" max="15" step="1" value="10" />
-            <output id="ascentRateValue">10 m/min</output>
-          </div>
-        </label>
-
-        <div class="subsection">
+        <div class="subsection subsection--primary">
           <div class="subsection-head">
             <h3>Mélange respiratoire</h3>
           </div>
