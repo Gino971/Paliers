@@ -6,6 +6,9 @@ const defaults = {
   mixPreset: "air",
   oxygenPercent: 21,
   heliumPercent: 0,
+  stopMixPreset: "air",
+  stopOxygenPercent: 21,
+  stopHeliumPercent: 0,
   secondDiveEnabled: false,
   surfaceInterval: 60,
   secondDepth: 20,
@@ -17,6 +20,12 @@ const defaults = {
 
 const state = {
   phaseDiagramSelectedIndex: 0,
+  stopGasMix: {
+    oxygenPercent: defaults.stopOxygenPercent,
+    heliumPercent: defaults.stopHeliumPercent,
+    nitrogenPercent: Math.max(0, 100 - defaults.stopOxygenPercent - defaults.stopHeliumPercent),
+    modeledInertFraction: Math.max(0, (100 - defaults.stopOxygenPercent - defaults.stopHeliumPercent * 0.5) / 100),
+  },
   additionalDives: [
     {
       enabled: false,
@@ -47,7 +56,7 @@ const HELIUM_EFFECT_FACTOR = 0.5;
 const HALDANE_RATIO = 2;
 const STEP_SIZE = 3;
 const EPSILON = 1e-6;
-const MAX_SEARCH_MINUTES = 600;
+const MAX_SEARCH_MINUTES = 1200;
 const HYPEROXIA_PP_THRESHOLD = 1.4;
 const HYPOXIA_PP_THRESHOLD = 0.16;
 const NARCOSIS_PP_THRESHOLD = 3.2;
@@ -64,6 +73,9 @@ const elements = {
   mixPreset: document.getElementById("mixPreset"),
   oxygenPercent: document.getElementById("oxygenPercent"),
   heliumPercent: document.getElementById("heliumPercent"),
+  stopMixPreset: document.getElementById("stopMixPreset"),
+  stopOxygenPercent: document.getElementById("stopOxygenPercent"),
+  stopHeliumPercent: document.getElementById("stopHeliumPercent"),
   secondDiveEnabled: document.getElementById("secondDiveEnabled"),
   surfaceInterval: document.getElementById("surfaceInterval"),
   secondDepth: document.getElementById("secondDepth"),
@@ -76,6 +88,11 @@ const elements = {
   oxygenPercentValue: document.getElementById("oxygenPercentValue"),
   heliumPercentValue: document.getElementById("heliumPercentValue"),
   oxygenWarning: document.getElementById("oxygenWarning"),
+  stopMixSummaryValue: document.getElementById("stopMixSummaryValue"),
+  stopOxygenPercentValue: document.getElementById("stopOxygenPercentValue"),
+  stopHeliumPercentValue: document.getElementById("stopHeliumPercentValue"),
+  stopGasWarning: document.getElementById("stopGasWarning"),
+  stopGasParams: document.getElementById("stopGasParams"),
   surfaceIntervalValue: document.getElementById("surfaceIntervalValue"),
   secondDepthValue: document.getElementById("secondDepthValue"),
   secondTimeValue: document.getElementById("secondTimeValue"),
@@ -134,13 +151,34 @@ function formatStopLabel(duration, depth) {
 function getMixPresets() {
   return {
     air: { oxygenPercent: 21, heliumPercent: 0 },
+    heliox1882: { oxygenPercent: 18, heliumPercent: 82 },
+    heliox2179: { oxygenPercent: 21, heliumPercent: 79 },
     nitrox32: { oxygenPercent: 32, heliumPercent: 0 },
     trimix2135: { oxygenPercent: 21, heliumPercent: 35 },
   };
 }
 
+function getStopMixPresets() {
+  return {
+    air: { oxygenPercent: 21, heliumPercent: 0 },
+    nitrox50: { oxygenPercent: 50, heliumPercent: 0 },
+    oxygen100: { oxygenPercent: 100, heliumPercent: 0 },
+  };
+}
+
 function getMixPresetName(oxygenPercent, heliumPercent) {
   const presets = getMixPresets();
+  for (const [name, preset] of Object.entries(presets)) {
+    if (preset.oxygenPercent === oxygenPercent && preset.heliumPercent === heliumPercent) {
+      return name;
+    }
+  }
+
+  return "custom";
+}
+
+function getStopMixPresetName(oxygenPercent, heliumPercent) {
+  const presets = getStopMixPresets();
   for (const [name, preset] of Object.entries(presets)) {
     if (preset.oxygenPercent === oxygenPercent && preset.heliumPercent === heliumPercent) {
       return name;
@@ -171,6 +209,15 @@ function getInspiredPartialPressure(depth, fraction) {
 
 function getOxygenPartialPressure(depth, oxygenPercent) {
   return getInspiredPartialPressure(depth, oxygenPercent / 100);
+}
+
+function getMaxSafeOxygenPercent(depth) {
+  const availablePressure = ambientPressure(depth) - WATER_VAPOR_PRESSURE;
+  if (availablePressure <= EPSILON) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.floor((HYPEROXIA_PP_THRESHOLD / availablePressure) * 100 + 1e-6)));
 }
 
 function getMaxPlannedDepth(primaryDepth, secondDiveEnabled, secondDepth, additionalDives) {
@@ -292,7 +339,7 @@ function renderGasDiagnostics(gasMix, maxPlannedDepth, rawGasMix) {
   elements.oxygenWarning.classList.toggle("mix-warning--safe", !diagnostics.some((diagnostic) => diagnostic.tone === "danger"));
 }
 
-function syncGasMixBounds() {
+function syncGasMixBounds(maxPlannedDepth = 0) {
   const oxygenPercent = Number(elements.oxygenPercent.value);
   const heliumMax = Math.max(0, 100 - oxygenPercent);
   elements.heliumPercent.max = String(heliumMax);
@@ -301,7 +348,7 @@ function syncGasMixBounds() {
   }
 
   const heliumPercent = Number(elements.heliumPercent.value);
-  const oxygenMax = Math.max(0, 100 - heliumPercent);
+  const oxygenMax = Math.max(0, Math.min(100 - heliumPercent, getMaxSafeOxygenPercent(maxPlannedDepth)));
   elements.oxygenPercent.max = String(oxygenMax);
   if (Number(elements.oxygenPercent.value) > oxygenMax) {
     elements.oxygenPercent.value = String(oxygenMax);
@@ -312,8 +359,8 @@ function syncGasMixPreset() {
   elements.mixPreset.value = getMixPresetName(Number(elements.oxygenPercent.value), Number(elements.heliumPercent.value));
 }
 
-function syncGasMixOutputs() {
-  syncGasMixBounds();
+function syncGasMixOutputs(maxPlannedDepth = 0) {
+  syncGasMixBounds(maxPlannedDepth);
   syncGasMixPreset();
   const gasMix = getGasMixFromInputs();
   elements.oxygenPercentValue.textContent = formatPercent(gasMix.oxygenPercent);
@@ -323,9 +370,60 @@ function syncGasMixOutputs() {
   return gasMix;
 }
 
+function getStopGasMixFromInputs() {
+  const oxygenPercent = Number(elements.stopOxygenPercent.value);
+  const heliumPercent = Number(elements.stopHeliumPercent.value);
+  return {
+    oxygenPercent,
+    heliumPercent,
+    nitrogenPercent: Math.max(0, 100 - oxygenPercent - heliumPercent),
+    modeledInertFraction: Math.max(0, (100 - oxygenPercent - heliumPercent * HELIUM_EFFECT_FACTOR) / 100),
+  };
+}
+
+function syncStopGasMixBounds(maxStopDepth = 0) {
+  const oxygenPercent = Number(elements.stopOxygenPercent.value);
+  const heliumMax = Math.max(0, 100 - oxygenPercent);
+  elements.stopHeliumPercent.max = String(heliumMax);
+  if (Number(elements.stopHeliumPercent.value) > heliumMax) {
+    elements.stopHeliumPercent.value = String(heliumMax);
+  }
+
+  const heliumPercent = Number(elements.stopHeliumPercent.value);
+  const oxygenMax = Math.max(0, Math.min(100 - heliumPercent, getMaxSafeOxygenPercent(maxStopDepth)));
+  elements.stopOxygenPercent.max = String(oxygenMax);
+  if (Number(elements.stopOxygenPercent.value) > oxygenMax) {
+    elements.stopOxygenPercent.value = String(oxygenMax);
+  }
+}
+
+function syncStopGasMixPreset() {
+  elements.stopMixPreset.value = getStopMixPresetName(Number(elements.stopOxygenPercent.value), Number(elements.stopHeliumPercent.value));
+}
+
+function syncStopGasMixOutputs(maxStopDepth = 0) {
+  syncStopGasMixBounds(maxStopDepth);
+  syncStopGasMixPreset();
+  const gasMix = getStopGasMixFromInputs();
+  elements.stopOxygenPercentValue.textContent = formatPercent(gasMix.oxygenPercent);
+  elements.stopHeliumPercentValue.textContent = formatPercent(gasMix.heliumPercent);
+  elements.stopMixSummaryValue.textContent = formatGasMixSummary(gasMix);
+  state.stopGasMix = gasMix;
+  return gasMix;
+}
+
+function applyStopGasPreset(presetName) {
+  const preset = getStopMixPresets()[presetName] || getStopMixPresets().air;
+  elements.stopOxygenPercent.value = String(preset.oxygenPercent);
+  syncStopGasMixBounds();
+  elements.stopHeliumPercent.value = String(preset.heliumPercent);
+  syncStopGasMixOutputs();
+}
+
 function applyGasMixPreset(presetName) {
   const preset = getMixPresets()[presetName] || getMixPresets().air;
   elements.oxygenPercent.value = String(preset.oxygenPercent);
+  syncGasMixBounds();
   elements.heliumPercent.value = String(preset.heliumPercent);
   syncGasMixOutputs();
 }
@@ -374,7 +472,7 @@ function renderAdditionalDiveBlock(dive, index) {
       <label class="field">
         <span>Profondeur plongée ${diveNumber}</span>
         <div class="field-row">
-          <input data-field="depth" data-dive-index="${index}" type="range" min="6" max="60" step="1" value="${dive.depth}" />
+          <input data-field="depth" data-dive-index="${index}" type="range" min="6" max="100" step="1" value="${dive.depth}" />
           <output>${dive.depth} m</output>
         </div>
       </label>
@@ -382,7 +480,7 @@ function renderAdditionalDiveBlock(dive, index) {
       <label class="field">
         <span>Temps plongée ${diveNumber}</span>
         <div class="field-row">
-          <input data-field="time" data-dive-index="${index}" type="range" min="5" max="180" step="1" value="${dive.time}" />
+          <input data-field="time" data-dive-index="${index}" type="range" min="5" max="240" step="1" value="${dive.time}" />
           <output>${dive.time} min</output>
         </div>
       </label>
@@ -405,6 +503,10 @@ function ambientPressure(depth) {
 
 function inspiredN2Pressure(depth) {
   const gasMix = state.gasMix || getGasMixFromInputs();
+  return Math.max(0, (ambientPressure(depth) - WATER_VAPOR_PRESSURE) * gasMix.modeledInertFraction);
+}
+
+function inspiredN2PressureWithGasMix(depth, gasMix) {
   return Math.max(0, (ambientPressure(depth) - WATER_VAPOR_PRESSURE) * gasMix.modeledInertFraction);
 }
 
@@ -431,19 +533,19 @@ function updateSchreiner(tension, inspiredStart, inspiredEnd, minutes, halfTime)
   return inspiredEnd - rate / k + (tension - inspiredStart + rate / k) * Math.exp(-k * minutes);
 }
 
-function buildSurfaceEquilibrium() {
-  const surfaceInspired = inspiredN2Pressure(0);
+function buildSurfaceEquilibrium(gasMix = state.gasMix || getGasMixFromInputs()) {
+  const surfaceInspired = inspiredN2PressureWithGasMix(0, gasMix);
   return compartments.map(() => surfaceInspired);
 }
 
-function simulateConstantPhase(tensions, depth, minutes) {
-  const inspiredPressure = inspiredN2Pressure(depth);
+function simulateConstantPhase(tensions, depth, minutes, gasMix = state.gasMix || getGasMixFromInputs()) {
+  const inspiredPressure = inspiredN2PressureWithGasMix(depth, gasMix);
   return tensions.map((tension, index) => updateConstant(tension, inspiredPressure, minutes, compartments[index].halfTime));
 }
 
-function simulateTravelPhase(tensions, fromDepth, toDepth, minutes) {
-  const inspiredStart = inspiredN2Pressure(fromDepth);
-  const inspiredEnd = inspiredN2Pressure(toDepth);
+function simulateTravelPhase(tensions, fromDepth, toDepth, minutes, gasMix = state.gasMix || getGasMixFromInputs()) {
+  const inspiredStart = inspiredN2PressureWithGasMix(fromDepth, gasMix);
+  const inspiredEnd = inspiredN2PressureWithGasMix(toDepth, gasMix);
   return tensions.map((tension, index) => updateSchreiner(tension, inspiredStart, inspiredEnd, minutes, compartments[index].halfTime));
 }
 
@@ -490,14 +592,14 @@ function isSafeAtDepth(tensions, depth) {
   return tensions.every((tension) => tension <= allowed + EPSILON);
 }
 
-function findHoldMinutes(tensions, currentDepth, nextDepth, travelMinutes) {
+function findHoldMinutes(tensions, currentDepth, nextDepth, travelMinutes, holdGasMix = state.gasMix || getGasMixFromInputs(), travelGasMix = state.gasMix || getGasMixFromInputs()) {
   let low = 0;
   let high = MAX_SEARCH_MINUTES;
 
   for (let iteration = 0; iteration < 48; iteration += 1) {
     const middle = (low + high) / 2;
-    const held = simulateConstantPhase(tensions, currentDepth, middle);
-    const projected = simulateTravelPhase(held, currentDepth, nextDepth, travelMinutes);
+    const held = simulateConstantPhase(tensions, currentDepth, middle, holdGasMix);
+    const projected = simulateTravelPhase(held, currentDepth, nextDepth, travelMinutes, travelGasMix);
 
     if (isSafeAtDepth(projected, nextDepth)) {
       high = middle;
@@ -509,9 +611,11 @@ function findHoldMinutes(tensions, currentDepth, nextDepth, travelMinutes) {
   return Math.max(1, Math.ceil(high));
 }
 
-function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabled, surfaceInterval, secondDepth, secondTime, additionalDives = []) {
+function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabled, surfaceInterval, secondDepth, secondTime, additionalDives = [], gasMix = state.gasMix || getGasMixFromInputs(), stopGasMix = state.stopGasMix || gasMix) {
   const firstDive = buildDiveModel(depth, time, descentRate, ascentRate, {
     labelPrefix: "Plongée 1",
+    gasMix,
+    stopGasMix,
   });
 
   if (!secondDiveEnabled) {
@@ -539,6 +643,8 @@ function buildDiveSequence(depth, time, descentRate, ascentRate, secondDiveEnabl
       startLabel: `Départ de la plongée ${diveNumber}`,
       startKind: "surfaceStart",
       startDepth: 0,
+      gasMix,
+      stopGasMix,
     });
 
     return {
@@ -652,7 +758,9 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
   const phases = [];
   const phaseSnapshots = [];
   const labelPrefix = options.labelPrefix ? `${options.labelPrefix} - ` : "";
-  const initialTensions = options.initialTensions ? cloneTensions(options.initialTensions) : buildSurfaceEquilibrium();
+  const travelGasMix = options.gasMix || state.gasMix || getGasMixFromInputs();
+  const stopGasMix = options.stopGasMix || travelGasMix;
+  const initialTensions = options.initialTensions ? cloneTensions(options.initialTensions) : buildSurfaceEquilibrium(travelGasMix);
   const startLabel = options.startLabel || "Surface initiale";
   const startKind = options.startKind || "surface";
   const startDepth = options.startDepth ?? 0;
@@ -676,11 +784,11 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
   recordPhase(startLabel, startKind, startDepth, tissues, 0);
 
   const descentMinutes = depth / descentRate;
-  tissues = simulateTravelPhase(tissues, startDepth, depth, descentMinutes);
+  tissues = simulateTravelPhase(tissues, startDepth, depth, descentMinutes, travelGasMix);
   phases.push({ label: `${labelPrefix}Descente ${startDepth} m → ${depth} m`, kind: "descent", duration: descentMinutes, from: startDepth, to: depth });
   recordPhase(`Fin de descente à ${depth} m`, "descent", depth, tissues, descentMinutes);
 
-  tissues = simulateConstantPhase(tissues, depth, time);
+  tissues = simulateConstantPhase(tissues, depth, time, travelGasMix);
   phases.push({ label: `${labelPrefix}Fond à ${depth} m`, kind: "bottom", duration: time, depth });
   const bottomSnapshot = recordPhase(`Fin du fond à ${depth} m`, "bottom", depth, tissues, time);
 
@@ -697,7 +805,7 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
 
     if (control.ceilingDepth <= EPSILON) {
       const ascentMinutes = currentDepth / ascentRate;
-      tissues = simulateTravelPhase(tissues, currentDepth, 0, ascentMinutes);
+      tissues = simulateTravelPhase(tissues, currentDepth, 0, ascentMinutes, travelGasMix);
       phases.push({ label: `${labelPrefix}Montée ${currentDepth} m → surface`, kind: "ascent", duration: ascentMinutes, from: currentDepth, to: 0 });
       recordPhase(`Arrivée surface depuis ${currentDepth} m`, "ascent", 0, tissues, ascentMinutes);
       currentDepth = 0;
@@ -709,8 +817,8 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
     if (stopDepth >= currentDepth - EPSILON) {
       const nextDepth = Math.max(0, currentDepth - STEP_SIZE);
       const travelMinutes = (currentDepth - nextDepth) / ascentRate;
-      const holdMinutes = findHoldMinutes(tissues, currentDepth, nextDepth, travelMinutes);
-      tissues = simulateConstantPhase(tissues, currentDepth, holdMinutes);
+      const holdMinutes = findHoldMinutes(tissues, currentDepth, nextDepth, travelMinutes, stopGasMix, travelGasMix);
+      tissues = simulateConstantPhase(tissues, currentDepth, holdMinutes, stopGasMix);
       const heldSnapshot = buildSnapshot(tissues, currentDepth);
       const heldControl = getControllingTissue(heldSnapshot);
 
@@ -733,7 +841,7 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
       recordPhase(`Fin du palier à ${currentDepth} m`, "stop", currentDepth, tissues, holdMinutes);
 
       const ascentMinutes = (currentDepth - nextDepth) / ascentRate;
-      tissues = simulateTravelPhase(tissues, currentDepth, nextDepth, ascentMinutes);
+      tissues = simulateTravelPhase(tissues, currentDepth, nextDepth, ascentMinutes, travelGasMix);
       phases.push({
         label: `${labelPrefix}Montée ${currentDepth} m → ${nextDepth} m`,
         kind: "ascent",
@@ -748,7 +856,7 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
     }
 
     const ascentMinutes = (currentDepth - stopDepth) / ascentRate;
-    tissues = simulateTravelPhase(tissues, currentDepth, stopDepth, ascentMinutes);
+    tissues = simulateTravelPhase(tissues, currentDepth, stopDepth, ascentMinutes, travelGasMix);
     phases.push({
       label: `${labelPrefix}Montée ${currentDepth} m → ${stopDepth} m`,
       kind: "ascent",
@@ -784,7 +892,7 @@ function buildDiveModel(depth, time, descentRate, ascentRate, options = {}) {
   };
 }
 
-function buildExplanation(depth, time, descentRate, ascentRate, model, gasMix) {
+function buildExplanation(depth, time, descentRate, ascentRate, model, gasMix, stopGasMix, stopGasEnabled) {
   const mixSummary = formatGasMixSummary(gasMix);
   const lines = [
     `1. On initialise les ${compartments.length} compartiments MN90 à la tension inspirée en surface pour ${mixSummary}: ${formatTension(inspiredN2Pressure(0))}.`,
@@ -793,15 +901,21 @@ function buildExplanation(depth, time, descentRate, ascentRate, model, gasMix) {
     `4. Pour la remontée, on recalcule les tensions à chaque phase: arrivée au palier, attente au palier, puis départ vers la phase suivante. Le critère reste P_tissu ≤ 2 × P_ambiante.`,
   ];
 
-  if (model.stops.length === 0) {
-    lines.push(`5. Aucun palier n'est nécessaire ici: le compartiment directeur reste sous le plafond Haldane autorisé jusqu'à la surface.`);
+  if (stopGasEnabled && model.stops.length > 0) {
+    lines.push(`5. Les paliers peuvent être respirés au mélange ${formatGasMixSummary(stopGasMix)}. Le premier palier doit rester sous sa MOD.`);
   } else {
-    const stopText = model.stops.map((stop) => `${formatMinutes(stop.minutes)} à ${formatDepth(stop.depth)}`).join(", ");
-    lines.push(`5. Le modèle impose ${model.stops.length} palier(s): ${stopText}. Le premier arrêt est piloté par ${model.firstStop.controllingTissue}.`);
+    lines.push(`5. Aucun gaz de palier n'est activé ici: tous les calculs restent faits avec le gaz du profil principal.`);
   }
 
-  lines.push(`6. Le temps total de remontée est de ${formatMinutes(model.totalAscentTime)} et la durée totale du profil est de ${formatMinutes(model.totalRuntime)}.`);
-  lines.push(`7. Le compartiment directeur du profil est ${model.controllingTissue.name} (${model.controllingTissue.label}), avec un plafond théorique maximal de ${formatDepth(model.maxCeiling)}.`);
+  if (model.stops.length === 0) {
+    lines.push(`6. Aucun palier n'est nécessaire ici: le compartiment directeur reste sous le plafond Haldane autorisé jusqu'à la surface.`);
+  } else {
+    const stopText = model.stops.map((stop) => `${formatMinutes(stop.minutes)} à ${formatDepth(stop.depth)}`).join(", ");
+    lines.push(`6. Le modèle impose ${model.stops.length} palier(s): ${stopText}. Le premier arrêt est piloté par ${model.firstStop.controllingTissue}.`);
+  }
+
+  lines.push(`7. Le temps total de remontée est de ${formatMinutes(model.totalAscentTime)} et la durée totale du profil est de ${formatMinutes(model.totalRuntime)}.`);
+  lines.push(`8. Le compartiment directeur du profil est ${model.controllingTissue.name} (${model.controllingTissue.label}), avec un plafond théorique maximal de ${formatDepth(model.maxCeiling)}.`);
 
   return lines;
 }
@@ -924,20 +1038,32 @@ function getPhaseDiagramPhaseText(sequence, phase, index, duration) {
   return parts.join(" • ");
 }
 
-function getPhaseDiagramTooltipText(sequence, phase, index, duration) {
-  return getPhaseDiagramPhaseText(sequence, phase, index, duration);
+function getPhaseDiagramTooltipText(sequence, phase, index, duration, stopGasMix, stopGasEnabled) {
+  const baseText = getPhaseDiagramPhaseText(sequence, phase, index, duration);
+
+  if (!stopGasEnabled || phase.kind !== "stop") {
+    return baseText;
+  }
+
+  return `${baseText} • Gaz de palier: ${formatGasMixSummary(stopGasMix)}`;
 }
 
-function getSelectedPhaseDiagramText(sequence, selectedIndex) {
+function getSelectedPhaseDiagramText(sequence, selectedIndex, stopGasMix, stopGasEnabled) {
   const phase = sequence.phases[selectedIndex];
   if (!phase) {
     return "Touchez une phase du graphique pour afficher ses informations.";
   }
 
-  return getPhaseDiagramPhaseText(sequence, phase, selectedIndex, phase.duration);
+  const baseText = getPhaseDiagramPhaseText(sequence, phase, selectedIndex, phase.duration);
+
+  if (!stopGasEnabled || phase.kind !== "stop") {
+    return baseText;
+  }
+
+  return `${baseText} • Gaz de palier: ${formatGasMixSummary(stopGasMix)}`;
 }
 
-function buildPhaseDiagram(sequence) {
+function buildPhaseDiagram(sequence, stopGasMix, stopGasEnabled) {
   const phases = sequence.phases;
   const chartPhases = phases;
   const selectedPhaseIndex = Math.min(Math.max(0, state.phaseDiagramSelectedIndex), Math.max(0, phases.length - 1));
@@ -1072,10 +1198,16 @@ function buildPhaseDiagram(sequence) {
           ${segments
             .map(
               (segment, index) => `
-                <g class="phase-diagram-segment-group phase-diagram-segment-group--${segment.phase.kind}${index === selectedPhaseIndex ? ' phase-diagram-segment-group--selected' : ''}" data-phase-index="${index}" aria-label="${getPhaseDiagramTooltipText(sequence, segment.phase, index, segment.duration)}">
-                  <title>${getPhaseDiagramTooltipText(sequence, segment.phase, index, segment.duration)}</title>
+                <g class="phase-diagram-segment-group phase-diagram-segment-group--${segment.phase.kind}${index === selectedPhaseIndex ? ' phase-diagram-segment-group--selected' : ''}" data-phase-index="${index}" aria-label="${getPhaseDiagramTooltipText(sequence, segment.phase, index, segment.duration, stopGasMix, stopGasEnabled)}">
+                  <title>${getPhaseDiagramTooltipText(sequence, segment.phase, index, segment.duration, stopGasMix, stopGasEnabled)}</title>
                   ${segment.isFlat ? `<rect class="phase-diagram-plateau phase-diagram-plateau--${segment.phase.kind}" x="${segment.plateauX}" y="${segment.plateauY}" width="${segment.plateauWidth}" height="10" rx="5"></rect>` : ""}
                   <line class="phase-diagram-segment phase-diagram-segment--${segment.phase.kind}${segment.isFlat ? ' phase-diagram-segment--flat' : ''}" x1="${segment.xStart}" y1="${segment.yStart}" x2="${segment.xEnd}" y2="${segment.yEnd}"></line>
+                  ${stopGasEnabled && segment.phase.kind === "stop" ? `
+                    <g class="phase-diagram-stopgas">
+                      <rect x="${segment.x - 46}" y="${Math.max(paddingY + 10, segment.y - 34)}" width="92" height="22" rx="11"></rect>
+                      <text x="${segment.x}" y="${Math.max(paddingY + 25, segment.y - 19)}" text-anchor="middle">${formatPercent(stopGasMix.oxygenPercent)} O2</text>
+                    </g>
+                  ` : ""}
                   ${segment.relationshipLabel ? `
                     <g class="phase-diagram-relationship phase-diagram-relationship--${segment.phase.relationship}">
                       <rect x="${segment.relationshipLabelX - 46}" y="${segment.relationshipLabelY - 15}" width="92" height="22" rx="11"></rect>
@@ -1094,7 +1226,7 @@ function buildPhaseDiagram(sequence) {
       </div>
       <div class="phase-diagram-info" aria-live="polite">
         <strong>Infos de phase</strong>
-        <p>${getSelectedPhaseDiagramText(sequence, Math.min(state.phaseDiagramSelectedIndex, sequence.phases.length - 1))}</p>
+        <p>${getSelectedPhaseDiagramText(sequence, Math.min(state.phaseDiagramSelectedIndex, sequence.phases.length - 1), stopGasMix, stopGasEnabled)}</p>
       </div>
   `;
 }
@@ -1175,11 +1307,12 @@ function buildPhaseTable(model) {
   `;
 }
 
-function buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth, secondTime, surfaceInterval, gasMix) {
+function buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth, secondTime, surfaceInterval, gasMix, stopGasMix, stopGasEnabled) {
   const model = sequence.finalModel;
   const surfaceInspired = inspiredN2Pressure(0);
   const depthInspired = inspiredN2Pressure(depth);
   const mixSummary = formatGasMixSummary(gasMix);
+  const stopMixSummary = formatGasMixSummary(stopGasMix);
   const descentMinutes = depth / descentRate;
   const directAscentMinutes = depth / ascentRate;
 
@@ -1212,13 +1345,17 @@ function buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth
       title: "7. Remontée par paliers",
       text: model.stops.length === 0
         ? `La remontée directe vers la surface reste compatible avec la règle Haldane; aucun palier n'est imposé dans ce profil.`
-        : `Chaque palier est recalculé à la phase suivante: ${model.stops.map((stop) => `${formatMinutes(stop.minutes)} à ${formatDepth(stop.depth)}`).join(", ")}.`,
+        : stopGasEnabled
+          ? `Chaque palier est recalculé à la phase suivante: ${model.stops.map((stop) => `${formatMinutes(stop.minutes)} à ${formatDepth(stop.depth)}`).join(", ")}. Le gaz de palier utilisé est ${stopMixSummary}.`
+          : `Chaque palier est recalculé à la phase suivante: ${model.stops.map((stop) => `${formatMinutes(stop.minutes)} à ${formatDepth(stop.depth)}`).join(", ")}.`,
     },
     {
       title: "8. Durée des paliers",
       text: model.stops.length === 0
         ? `La durée de palier est nulle ici parce qu'aucun tissu ne dépasse le plafond autorisé au moment de la remontée. La surface est atteinte directement.`
-        : `Pour chaque phase, on cherche la plus petite durée de maintien, t, telle qu'après le palier puis la remontée vers la phase suivante, la tension de tous les tissus vérifie P_tissu ≤ 2 × P_ambiante. Dans le code, cette durée est trouvée par dichotomie. Le premier palier dure ${formatMinutes(model.stops[0].minutes)}.`,
+        : stopGasEnabled
+          ? `Pour chaque phase, on cherche la plus petite durée de maintien, t, telle qu'après le palier puis la remontée vers la phase suivante, la tension de tous les tissus vérifie P_tissu ≤ 2 × P_ambiante. Les paliers sont respirés au mélange ${stopMixSummary}. Dans le code, cette durée est trouvée par dichotomie. Le premier palier dure ${formatMinutes(model.stops[0].minutes)}.`
+          : `Pour chaque phase, on cherche la plus petite durée de maintien, t, telle qu'après le palier puis la remontée vers la phase suivante, la tension de tous les tissus vérifie P_tissu ≤ 2 × P_ambiante. Dans le code, cette durée est trouvée par dichotomie. Le premier palier dure ${formatMinutes(model.stops[0].minutes)}.`,
     },
     {
       title: "9. Plongées successives et consécutives",
@@ -1286,6 +1423,15 @@ function syncSecondDiveParamsVisibility(secondDiveEnabled) {
       element.disabled = !secondDiveEnabled;
     }
   });
+}
+
+function syncStopGasParamsVisibility(stopGasEnabled) {
+  elements.stopGasParams.hidden = false;
+  elements.stopGasParams.setAttribute("aria-hidden", "false");
+
+  if (elements.stopGasWarning) {
+    elements.stopGasWarning.hidden = false;
+  }
 }
 
 function syncAdditionalDivesVisibility(secondDiveEnabled) {
@@ -1358,16 +1504,19 @@ function render() {
   const time = Number(elements.time.value);
   const descentRate = Number(elements.descentRate.value);
   const ascentRate = Number(elements.ascentRate.value);
-  const rawGasMix = {
-    oxygenPercent: Number(elements.oxygenPercent.value),
-    heliumPercent: Number(elements.heliumPercent.value),
-  };
-  const gasMix = syncGasMixOutputs();
+  const stopGasEnabled = true;
   const secondDiveEnabled = elements.secondDiveEnabled.checked;
   const surfaceInterval = Number(elements.surfaceInterval.value);
   const secondDepth = Number(elements.secondDepth.value);
   const secondTime = Number(elements.secondTime.value);
-  const sequence = buildDiveSequence(
+  const maxPlannedDepth = getMaxPlannedDepth(depth, secondDiveEnabled, secondDepth, state.additionalDives);
+  const rawGasMix = {
+    oxygenPercent: Number(elements.oxygenPercent.value),
+    heliumPercent: Number(elements.heliumPercent.value),
+  };
+  const gasMix = syncGasMixOutputs(maxPlannedDepth);
+  let stopGasMix = syncStopGasMixOutputs();
+  let sequence = buildDiveSequence(
     depth,
     time,
     descentRate,
@@ -1376,11 +1525,38 @@ function render() {
     surfaceInterval,
     secondDepth,
     secondTime,
-    state.additionalDives
+    state.additionalDives,
+    gasMix,
+    stopGasMix
   );
-  const model = sequence.finalModel;
-  const maxPlannedDepth = getMaxPlannedDepth(depth, secondDiveEnabled, secondDepth, state.additionalDives);
+  let model = sequence.finalModel;
+  let maxStopDepth = model.stops.length ? Math.max(...model.stops.map((stop) => stop.depth)) : 0;
 
+  if (stopGasEnabled) {
+    const clampedStopGasMix = syncStopGasMixOutputs(maxStopDepth);
+    const stopGasChanged = clampedStopGasMix.oxygenPercent !== stopGasMix.oxygenPercent || clampedStopGasMix.heliumPercent !== stopGasMix.heliumPercent;
+    if (stopGasChanged) {
+      stopGasMix = clampedStopGasMix;
+      sequence = buildDiveSequence(
+        depth,
+        time,
+        descentRate,
+        ascentRate,
+        secondDiveEnabled,
+        surfaceInterval,
+        secondDepth,
+        secondTime,
+        state.additionalDives,
+        gasMix,
+        stopGasMix
+      );
+      model = sequence.finalModel;
+      maxStopDepth = model.stops.length ? Math.max(...model.stops.map((stop) => stop.depth)) : 0;
+      stopGasMix = syncStopGasMixOutputs(maxStopDepth);
+    }
+  }
+
+  syncStopGasParamsVisibility(stopGasEnabled);
   syncSecondDiveParamsVisibility(secondDiveEnabled);
   elements.additionalDives.innerHTML = buildAdditionalDiveBlocks();
   syncAdditionalDivesVisibility(secondDiveEnabled);
@@ -1388,6 +1564,19 @@ function render() {
 
   syncVisibleSliderValues();
   renderGasDiagnostics(gasMix, maxPlannedDepth, rawGasMix);
+  if (elements.stopGasWarning) {
+    if (stopGasEnabled && model.stops.length > 0) {
+      const stopGasWarningText = getOxygenWarningText(stopGasMix, maxStopDepth).replace(/^Avertissement hyperoxyque:\s*/u, "Gaz de palier: ");
+      elements.stopGasWarning.textContent = stopGasWarningText;
+      const stopGasHyperoxic = getOxygenPartialPressure(maxStopDepth, stopGasMix.oxygenPercent) > HYPEROXIA_PP_THRESHOLD + 1e-6;
+      elements.stopGasWarning.classList.toggle("mix-warning--danger", stopGasHyperoxic);
+      elements.stopGasWarning.classList.toggle("mix-warning--safe", !stopGasHyperoxic);
+    } else if (stopGasEnabled) {
+      elements.stopGasWarning.textContent = "Gaz de palier activé, mais aucun palier n'est calculé sur ce profil.";
+      elements.stopGasWarning.classList.remove("mix-warning--danger");
+      elements.stopGasWarning.classList.add("mix-warning--safe");
+    }
+  }
 
   elements.pressureValue.textContent = formatPressure(sequence.primaryModel.pressure);
   elements.ndlValue.textContent = formatMinutes(sequence.primaryModel.ndl);
@@ -1398,7 +1587,7 @@ function render() {
   elements.ascentTimeValue.textContent = formatMinutes(sequence.combinedAscentTime);
   elements.runtimeValue.textContent = formatMinutes(sequence.combinedRuntime);
 
-  elements.steps.innerHTML = buildExplanation(depth, time, descentRate, ascentRate, model, gasMix)
+  elements.steps.innerHTML = buildExplanation(depth, time, descentRate, ascentRate, model, gasMix, stopGasMix, stopGasEnabled)
     .map((step) => `<li>${step}</li>`)
     .join("");
 
@@ -1406,7 +1595,7 @@ function render() {
     const phaseDiagramScroll = elements.phaseDiagram.querySelector(".phase-diagram-scroll");
     const previousPhaseDiagramScrollLeft = phaseDiagramScroll instanceof HTMLElement ? phaseDiagramScroll.scrollLeft : 0;
 
-    elements.phaseDiagram.innerHTML = buildPhaseDiagram(sequence);
+    elements.phaseDiagram.innerHTML = buildPhaseDiagram(sequence, stopGasMix, stopGasEnabled);
 
     const nextPhaseDiagramScroll = elements.phaseDiagram.querySelector(".phase-diagram-scroll");
     if (nextPhaseDiagramScroll instanceof HTMLElement) {
@@ -1419,7 +1608,7 @@ function render() {
   const phaseTableElement = document.getElementById("phaseTable");
   phaseTableElement.innerHTML = buildPhaseTable(sequence);
 
-  const courseItems = buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth, secondTime, surfaceInterval, gasMix);
+  const courseItems = buildCourse(sequence, depth, time, descentRate, ascentRate, secondDepth, secondTime, surfaceInterval, gasMix, stopGasMix, stopGasEnabled);
   const courseElement = document.getElementById("course");
   courseElement.innerHTML = courseItems
     .map(
@@ -1437,6 +1626,22 @@ elements.mixPreset.addEventListener("change", (event) => {
   applyGasMixPreset(event.target.value);
   render();
 });
+
+elements.stopMixPreset.addEventListener("change", (event) => {
+  applyStopGasPreset(event.target.value);
+  render();
+});
+
+elements.stopOxygenPercent.addEventListener("input", () => {
+  syncStopGasMixOutputs();
+});
+
+elements.stopHeliumPercent.addEventListener("input", () => {
+  syncStopGasMixOutputs();
+});
+
+elements.stopOxygenPercent.addEventListener("change", render);
+elements.stopHeliumPercent.addEventListener("change", render);
 
 elements.oxygenPercent.addEventListener("input", () => {
   syncGasMixOutputs();
@@ -1509,4 +1714,8 @@ if (elements.phaseDiagram) {
   });
 }
 
-render();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", render, { once: true });
+} else {
+  render();
+}
