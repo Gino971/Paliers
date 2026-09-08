@@ -534,10 +534,10 @@ function getOxygenWarningText(gasMix, maxPlannedDepth) {
   const maxOperatingDepth = gasMix.oxygenPercent <= 0 ? 0 : Math.max(0, ((threshold / (gasMix.oxygenPercent / 100)) + WATER_VAPOR_PRESSURE - 1) * 10);
 
   if (ppO2 > threshold + 1e-6) {
-    return `Avertissement hyperoxyque: à ${formatDepth(maxPlannedDepth)}, la pression partielle d'O2 atteint ${ppO2.toFixed(2)} bar, au-dessus du seuil de ${threshold.toFixed(1)} bar. MOD approx. à ${formatDepth(maxOperatingDepth)}.`;
+    return `Avertissement hyperoxyque: à ${formatDepth(maxPlannedDepth)}, la pression partielle d'O2 atteint ${ppO2.toFixed(2)} bar, au-dessus du seuil de ${threshold.toFixed(1)} bar. Profondeur maximale d’utilisation: ${formatDepth(maxOperatingDepth)}.`;
   }
 
-  return `Pression partielle d'O2 à ${formatDepth(maxPlannedDepth)}: ${ppO2.toFixed(2)} bar. Seuil hyperoxyque de ${threshold.toFixed(1)} bar non dépassé. MOD approx. à ${formatDepth(maxOperatingDepth)}.`;
+  return `Pression partielle d'O2 à ${formatDepth(maxPlannedDepth)}: ${ppO2.toFixed(2)} bar. Seuil hyperoxyque de ${threshold.toFixed(1)} bar non dépassé. Profondeur maximale d’utilisation: ${formatDepth(maxOperatingDepth)}.`;
 }
 
 function isHyperoxic(gasMix, maxPlannedDepth) {
@@ -561,8 +561,8 @@ function buildGasDiagnostics(gasMix, maxPlannedDepth, rawGasMix) {
     tone: ppO2 > HYPEROXIA_PP_THRESHOLD + EPSILON ? "danger" : "safe",
     title: "Hyperoxie",
     text: ppO2 > HYPEROXIA_PP_THRESHOLD + EPSILON
-      ? `À ${formatDepth(maxPlannedDepth)}, la pression partielle d'O2 atteint ${ppO2.toFixed(2)} bar, au-dessus du seuil de ${HYPEROXIA_PP_THRESHOLD.toFixed(1)} bar. MOD approx. à ${formatDepth(maxOperatingDepth)}.`
-      : `À ${formatDepth(maxPlannedDepth)}, la pression partielle d'O2 reste à ${ppO2.toFixed(2)} bar. MOD approx. à ${formatDepth(maxOperatingDepth)}.`,
+      ? `À ${formatDepth(maxPlannedDepth)}, la pression partielle d'O2 atteint ${ppO2.toFixed(2)} bar, au-dessus du seuil de ${HYPEROXIA_PP_THRESHOLD.toFixed(1)} bar. Profondeur maximale d’utilisation: ${formatDepth(maxOperatingDepth)}.`
+      : `À ${formatDepth(maxPlannedDepth)}, la pression partielle d'O2 reste à ${ppO2.toFixed(2)} bar. Profondeur maximale d’utilisation: ${formatDepth(maxOperatingDepth)}.`,
   });
 
   const surfacePpO2 = getOxygenPartialPressure(0, gasMix.oxygenPercent);
